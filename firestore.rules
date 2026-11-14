@@ -1,0 +1,139 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Reusable Primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidVaultEntry(data) {
+      return data.userId is string &&
+             data.userId.size() >= 1 &&
+             data.userId.size() <= 128 &&
+             data.userId == request.auth.uid &&
+             data.catalogId is string &&
+             data.catalogId.size() >= 1 &&
+             data.catalogId.size() <= 128 &&
+             data.catalogId.matches('^[a-zA-Z0-9_\\-]+$') &&
+             data.title is string &&
+             data.title.size() >= 1 &&
+             data.title.size() <= 160 &&
+             data.mediaType in ['movie', 'series'] &&
+             data.status in ['want_to_watch', 'watched'] &&
+             data.priority is bool &&
+             data.releaseYear is int &&
+             data.releaseYear >= 1888 &&
+             data.releaseYear <= 2100 &&
+             data.genres is list &&
+             data.genres.size() <= 10 &&
+             (data.genres.size() == 0 || data.genres[0] is string) &&
+             data.directorOrCreator is string &&
+             data.directorOrCreator.size() <= 120 &&
+             data.runtimeOrSeasons is string &&
+             data.runtimeOrSeasons.size() <= 60 &&
+             data.synopsis is string &&
+             data.synopsis.size() <= 1500 &&
+             data.posterKey is string &&
+             data.posterKey.size() >= 1 &&
+             data.posterKey.size() <= 40 &&
+             (data.userRating is int || data.userRating is float) &&
+             data.userRating >= 0 &&
+             data.userRating <= 10 &&
+             data.reviewTitle is string &&
+             data.reviewTitle.size() <= 160 &&
+             data.reviewBody is string &&
+             data.reviewBody.size() <= 4000 &&
+             data.favoriteQuote is string &&
+             data.favoriteQuote.size() <= 400 &&
+             data.containsSpoilers is bool &&
+             data.rewatchCount is int &&
+             data.rewatchCount >= 0 &&
+             data.rewatchCount <= 1000 &&
+             data.episodesWatched is int &&
+             data.episodesWatched >= 0 &&
+             data.episodesWatched <= 5000 &&
+             data.totalEpisodes is int &&
+             data.totalEpisodes >= 0 &&
+             data.totalEpisodes <= 5000 &&
+             data.customTitle is bool &&
+             data.createdAt is timestamp &&
+             data.createdAt <= request.time &&
+             data.updatedAt is timestamp &&
+             data.updatedAt <= request.time;
+    }
+
+    match /users/{userId}/vaultEntries/{entryId} {
+      allow get: if isSignedIn() && request.auth.uid == userId && isValidId(entryId);
+      allow list: if isSignedIn() && request.auth.uid == userId;
+
+      allow create: if isSignedIn() &&
+                       request.auth.uid == userId &&
+                       isValidId(entryId) &&
+                       incoming().keys().hasAll([
+                         'userId', 'catalogId', 'title', 'mediaType', 'status',
+                         'priority', 'releaseYear', 'genres', 'directorOrCreator',
+                         'runtimeOrSeasons', 'synopsis', 'posterKey', 'userRating',
+                         'reviewTitle', 'reviewBody', 'favoriteQuote', 'containsSpoilers',
+                         'rewatchCount', 'episodesWatched', 'totalEpisodes',
+                         'customTitle', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'catalogId', 'title', 'mediaType', 'status',
+                         'priority', 'releaseYear', 'genres', 'directorOrCreator',
+                         'runtimeOrSeasons', 'synopsis', 'posterKey', 'userRating',
+                         'reviewTitle', 'reviewBody', 'favoriteQuote', 'containsSpoilers',
+                         'rewatchCount', 'episodesWatched', 'totalEpisodes',
+                         'customTitle', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidVaultEntry(incoming());
+
+      allow update: if isSignedIn() &&
+                       request.auth.uid == userId &&
+                       isValidId(entryId) &&
+                       isValidVaultEntry(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().catalogId == existing().catalogId &&
+                       incoming().customTitle == existing().customTitle &&
+                       incoming().createdAt == existing().createdAt &&
+                       (
+                         // Action 1: Status / Priority / Episode & Rewatch Progress
+                         incoming().diff(existing()).affectedKeys().hasOnly([
+                           'status', 'priority', 'episodesWatched', 'rewatchCount', 'updatedAt'
+                         ]) ||
+                         // Action 2: Personal Rating & Review Update
+                         incoming().diff(existing()).affectedKeys().hasOnly([
+                           'userRating', 'reviewTitle', 'reviewBody', 'favoriteQuote',
+                           'containsSpoilers', 'status', 'updatedAt'
+                         ]) ||
+                         // Action 3: Full Entry Metadata Edit
+                         incoming().diff(existing()).affectedKeys().hasOnly([
+                           'title', 'mediaType', 'status', 'priority', 'releaseYear',
+                           'genres', 'directorOrCreator', 'runtimeOrSeasons', 'synopsis',
+                           'posterKey', 'userRating', 'reviewTitle', 'reviewBody',
+                           'favoriteQuote', 'containsSpoilers', 'rewatchCount',
+                           'episodesWatched', 'totalEpisodes', 'updatedAt'
+                         ])
+                       );
+
+      allow delete: if isSignedIn() && request.auth.uid == userId && isValidId(entryId);
+    }
+  }
+}

@@ -1,0 +1,140 @@
+{
+  "entities": {
+    "VaultEntry": {
+      "title": "VaultEntry",
+      "description": "A user's saved movie or series record including watchlist/watched status, personal rating, episode progress, and full written review.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID."
+        },
+        "catalogId": {
+          "type": "string",
+          "description": "Reference ID of the curated catalog item or custom entry."
+        },
+        "title": {
+          "type": "string",
+          "description": "Movie or series title."
+        },
+        "mediaType": {
+          "type": "string",
+          "enum": ["movie", "series"],
+          "description": "Whether this title is a movie or a series."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["want_to_watch", "watched"],
+          "description": "User tracking list status."
+        },
+        "priority": {
+          "type": "boolean",
+          "description": "Marks a title as Up Next / high priority in the watchlist."
+        },
+        "releaseYear": {
+          "type": "integer",
+          "description": "Release year of the movie or series."
+        },
+        "genres": {
+          "type": "array",
+          "description": "Up to 10 genre tags."
+        },
+        "directorOrCreator": {
+          "type": "string",
+          "description": "Director or series creator name."
+        },
+        "runtimeOrSeasons": {
+          "type": "string",
+          "description": "Runtime (e.g. 2h 46m) or season count (e.g. 3 Seasons)."
+        },
+        "synopsis": {
+          "type": "string",
+          "description": "Plot summary of the movie or series."
+        },
+        "posterKey": {
+          "type": "string",
+          "description": "Visual theme or bundled artwork key."
+        },
+        "userRating": {
+          "type": "number",
+          "description": "Personal user rating from 0.0 (unrated) to 10.0."
+        },
+        "reviewTitle": {
+          "type": "string",
+          "description": "Headline of the user's personal review."
+        },
+        "reviewBody": {
+          "type": "string",
+          "description": "Full text of the user's personal review."
+        },
+        "favoriteQuote": {
+          "type": "string",
+          "description": "Optional favorite quote or memorable scene note."
+        },
+        "containsSpoilers": {
+          "type": "boolean",
+          "description": "Whether the review contains spoilers."
+        },
+        "rewatchCount": {
+          "type": "integer",
+          "description": "Number of times rewatched."
+        },
+        "episodesWatched": {
+          "type": "integer",
+          "description": "Number of episodes watched for a series."
+        },
+        "totalEpisodes": {
+          "type": "integer",
+          "description": "Total episodes for a series."
+        },
+        "customTitle": {
+          "type": "boolean",
+          "description": "True if created manually by the user rather than from the curated catalog."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp set via FieldValue.serverTimestamp()."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp set via FieldValue.serverTimestamp()."
+        }
+      },
+      "required": [
+        "userId",
+        "catalogId",
+        "title",
+        "mediaType",
+        "status",
+        "priority",
+        "releaseYear",
+        "genres",
+        "directorOrCreator",
+        "runtimeOrSeasons",
+        "synopsis",
+        "posterKey",
+        "userRating",
+        "reviewTitle",
+        "reviewBody",
+        "favoriteQuote",
+        "containsSpoilers",
+        "rewatchCount",
+        "episodesWatched",
+        "totalEpisodes",
+        "customTitle",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/vaultEntries/{entryId}": {
+      "schema": {
+        "$ref": "#/entities/VaultEntry"
+      },
+      "description": "User-scoped collection storing watchlist items, watched movies/series, ratings, and full reviews."
+    }
+  }
+}

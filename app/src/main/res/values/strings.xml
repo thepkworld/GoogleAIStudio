@@ -1,0 +1,15 @@
+<resources>
+    <string name="app_name">CineVault</string>
+    <string name="tagline">Curate every frame you watch.</string>
+    <string name="nav_browse">Browse</string>
+    <string name="nav_watchlist">Watchlist</string>
+    <string name="nav_watched">Watched</string>
+    <string name="nav_reviews">Reviews</string>
+    <string name="sign_in_google">Sign in with Google</string>
+    <string name="sign_out">Sign out</string>
+    <string name="add_custom_title">Add Title</string>
+    <string name="want_to_watch">Want to Watch</string>
+    <string name="watched">Watched</string>
+    <string name="write_review">Write Review</string>
+    <string name="save_review">Save Review</string>
+</resources>

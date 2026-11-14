@@ -1,0 +1,6 @@
+{
+  "name": "CineVault",
+  "description": "A cinema-inspired movie and series organizer to browse titles, track your watchlist and watched history, and write detailed ratings and reviews.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
