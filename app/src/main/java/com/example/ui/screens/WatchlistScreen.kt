@@ -94,12 +94,12 @@ fun WatchlistScreen(
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(
-                            text = "WANT TO WATCH",
+                            text = "BUCKETLIST",
                             style = MaterialTheme.typography.labelMedium,
                             color = CinemaGold
                         )
                         Text(
-                            text = "${stats.totalWatchlist} Titles Queued",
+                            text = "${stats.totalWatchlist} Titles to Watch",
                             style = MaterialTheme.typography.headlineMedium,
                             color = CinemaAlabaster
                         )
@@ -176,9 +176,9 @@ fun WatchlistScreen(
             item(key = "watchlist_empty") {
                 EmptyVaultState(
                     icon = Icons.Rounded.BookmarkAdd,
-                    title = "Your Want to Watch list is empty",
-                    subtitle = "Browse acclaimed films and series or add your own custom title to plan your next watch.",
-                    actionLabel = "Browse Movies & Series",
+                    title = "Your BucketList is empty",
+                    subtitle = "Save movies and series from Home or Search to plan what to watch next.",
+                    actionLabel = "Search Movies & Series",
                     onActionClick = onBrowseClick
                 )
             }
@@ -346,7 +346,7 @@ private fun WatchlistItemCard(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Mark Watched",
+                        text = "Mark Seen",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold
                     )

@@ -9,8 +9,10 @@ import com.example.data.model.CollectionDetail
 import com.example.data.model.CollectionSummary
 import com.example.data.model.DiscoverSort
 import com.example.data.model.MediaType
+import com.example.data.model.OttPlatform
 import com.example.data.model.PersonDetail
 import com.example.data.model.PersonSummary
+import com.example.data.model.RatingScale
 import com.example.data.model.SearchScope
 import com.example.data.model.SeasonDetail
 import com.example.data.model.TmdbGenre
@@ -19,6 +21,11 @@ import com.example.data.model.VaultEntry
 import com.example.data.model.WatchStatus
 import com.example.data.repository.VaultRepository
 import com.example.data.tmdb.TmdbRepository
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
+import kotlin.math.roundToInt
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -56,16 +63,38 @@ enum class WatchlistSort(val label: String) {
 }
 
 enum class WatchedSort(val label: String) {
-    RECENT("Recently Logged"),
+    RECENT("Recently Watched"),
     RATING("Highest Rated"),
+    LOWEST_RATING("Lowest Rated"),
     YEAR("Release Year"),
     TITLE("Title A–Z")
+}
+
+enum class WatchedTimeFilter(val label: String) {
+    ALL_TIME("All Time"),
+    THIS_MONTH("This Month"),
+    LAST_30_DAYS("Last 30 Days"),
+    THIS_YEAR("This Year")
+}
+
+enum class WatchedRatingFilter(val label: String) {
+    ALL("All Ratings"),
+    TOP_TIER("9–10 Masterpiece"),
+    GREAT("7–8 Great"),
+    MID("5–6 Good/Avg"),
+    LOW("1–4 Low Rated"),
+    REVIEWED("Has Review"),
+    UNRATED("Unrated")
 }
 
 data class VaultStats(
     val totalWatched: Int = 0,
     val watchedMovies: Int = 0,
     val watchedSeries: Int = 0,
+    val watchedThisMonth: Int = 0,
+    val watchedMoviesThisMonth: Int = 0,
+    val watchedSeriesThisMonth: Int = 0,
+    val currentMonthLabel: String = "",
     val totalWatchlist: Int = 0,
     val priorityWatchlist: Int = 0,
     val averageRating: Double = 0.0,
@@ -73,6 +102,20 @@ data class VaultStats(
     val totalReviews: Int = 0,
     val ratingBuckets: List<Int> = listOf(0, 0, 0, 0, 0),
     val topGenres: List<Pair<String, Int>> = emptyList()
+)
+
+data class HomeUiState(
+    val isLoading: Boolean = false,
+    val isLoadingOtt: Boolean = false,
+    val isLiveTmdb: Boolean = false,
+    val selectedOttPlatform: OttPlatform = OttPlatform.ALL,
+    val featuredTitle: CatalogTitle = CatalogRepository.featuredTitle(),
+    val bollywoodMovies: List<CatalogTitle> = CatalogRepository.bollywoodFallback(),
+    val hollywoodMovies: List<CatalogTitle> = CatalogRepository.hollywoodFallback(),
+    val ottNewMovies: List<CatalogTitle> = CatalogRepository.ottNewFallback(),
+    val classicMovies: List<CatalogTitle> = CatalogRepository.classicFallback(),
+    val famousMovies: List<CatalogTitle> = CatalogRepository.famousFallback(),
+    val trendingPeople: List<PersonSummary> = emptyList()
 )
 
 data class BrowseUiState(
@@ -147,16 +190,31 @@ class VaultViewModel(
     private val _isLoadingSeason = MutableStateFlow(false)
     val isLoadingSeason: StateFlow<Boolean> = _isLoadingSeason.asStateFlow()
 
-    // Watchlist filters
+    private val _homeUiState = MutableStateFlow(HomeUiState())
+    val homeUiState: StateFlow<HomeUiState> = _homeUiState.asStateFlow()
+
+    // Watchlist (BucketList) filters
     private val _watchlistFilter = MutableStateFlow(MediaFilter.ALL)
     val watchlistFilter: StateFlow<MediaFilter> = _watchlistFilter.asStateFlow()
 
     private val _watchlistSort = MutableStateFlow(WatchlistSort.PRIORITY)
     val watchlistSort: StateFlow<WatchlistSort> = _watchlistSort.asStateFlow()
 
-    // Watched filters
+    // Library (Watched) filters
+    private val _watchedSearchQuery = MutableStateFlow("")
+    val watchedSearchQuery: StateFlow<String> = _watchedSearchQuery.asStateFlow()
+
     private val _watchedFilter = MutableStateFlow(MediaFilter.ALL)
     val watchedFilter: StateFlow<MediaFilter> = _watchedFilter.asStateFlow()
+
+    private val _watchedTimeFilter = MutableStateFlow(WatchedTimeFilter.ALL_TIME)
+    val watchedTimeFilter: StateFlow<WatchedTimeFilter> = _watchedTimeFilter.asStateFlow()
+
+    private val _watchedRatingFilter = MutableStateFlow(WatchedRatingFilter.ALL)
+    val watchedRatingFilter: StateFlow<WatchedRatingFilter> = _watchedRatingFilter.asStateFlow()
+
+    private val _watchedGenreFilter = MutableStateFlow("All")
+    val watchedGenreFilter: StateFlow<String> = _watchedGenreFilter.asStateFlow()
 
     private val _watchedSort = MutableStateFlow(WatchedSort.RECENT)
     val watchedSort: StateFlow<WatchedSort> = _watchedSort.asStateFlow()
@@ -173,6 +231,7 @@ class VaultViewModel(
 
     private var searchJob: Job? = null
     private var sectionJob: Job? = null
+    private var ottJob: Job? = null
     private var detailJob: Job? = null
     private var personJob: Job? = null
     private var collectionJob: Job? = null
@@ -240,19 +299,96 @@ class VaultViewModel(
         initialValue = emptyList()
     )
 
+    val watchedAvailableGenres: StateFlow<List<String>> = vaultEntriesState
+        .map { state ->
+            val watched = (state as? UiState.Success)?.data.orEmpty()
+                .filter { it.statusEnum == WatchStatus.WATCHED }
+            listOf("All") + watched.flatMap { it.genres }.distinct().sorted()
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+            initialValue = listOf("All")
+        )
+
+    private data class WatchedFilterBundle(
+        val query: String,
+        val media: MediaFilter,
+        val time: WatchedTimeFilter,
+        val rating: WatchedRatingFilter,
+        val genre: String,
+        val sort: WatchedSort
+    )
+
+    private val watchedFilterBundle = combine(
+        combine(_watchedSearchQuery, _watchedFilter, _watchedTimeFilter) { q, m, t -> Triple(q, m, t) },
+        combine(_watchedRatingFilter, _watchedGenreFilter, _watchedSort) { r, g, s -> Triple(r, g, s) }
+    ) { first, second ->
+        WatchedFilterBundle(
+            query = first.first,
+            media = first.second,
+            time = first.third,
+            rating = second.first,
+            genre = second.second,
+            sort = second.third
+        )
+    }
+
     val watchedEntries: StateFlow<List<VaultEntry>> = combine(
         vaultEntriesState,
-        _watchedFilter,
-        _watchedSort
-    ) { state, filter, sort ->
+        watchedFilterBundle
+    ) { state, filters ->
+        val nowCal = Calendar.getInstance()
+        val currentYear = nowCal.get(Calendar.YEAR)
+        val currentMonth = nowCal.get(Calendar.MONTH)
+        val thirtyDaysAgo = System.currentTimeMillis() - 30L * 24L * 60L * 60L * 1000L
+        val cleanQuery = filters.query.trim().lowercase()
+
         val entries = (state as? UiState.Success)?.data.orEmpty()
             .filter { it.statusEnum == WatchStatus.WATCHED }
-            .filterByMedia(filter)
-        when (sort) {
-            WatchedSort.RECENT -> entries.sortedByDescending { maxOf(it.updatedAt, it.createdAt) }
+            .filterByMedia(filters.media)
+            .filter { entry ->
+                val matchesQuery = cleanQuery.isEmpty() ||
+                    entry.title.lowercase().contains(cleanQuery) ||
+                    entry.directorOrCreator.lowercase().contains(cleanQuery) ||
+                    entry.reviewTitle.lowercase().contains(cleanQuery) ||
+                    entry.reviewBody.lowercase().contains(cleanQuery) ||
+                    entry.genres.any { it.lowercase().contains(cleanQuery) }
+
+                val ts = entry.effectiveWatchedAt
+                val matchesTime = when (filters.time) {
+                    WatchedTimeFilter.ALL_TIME -> true
+                    WatchedTimeFilter.THIS_MONTH -> isSameMonthYear(ts, currentYear, currentMonth)
+                    WatchedTimeFilter.LAST_30_DAYS -> ts >= thirtyDaysAgo
+                    WatchedTimeFilter.THIS_YEAR -> isSameYear(ts, currentYear)
+                }
+
+                val rounded = if (entry.userRating > 0.0) entry.userRating.roundToInt() else 0
+                val matchesRating = when (filters.rating) {
+                    WatchedRatingFilter.ALL -> true
+                    WatchedRatingFilter.TOP_TIER -> rounded in 9..10
+                    WatchedRatingFilter.GREAT -> rounded in 7..8
+                    WatchedRatingFilter.MID -> rounded in 5..6
+                    WatchedRatingFilter.LOW -> rounded in 1..4
+                    WatchedRatingFilter.REVIEWED -> entry.hasReview
+                    WatchedRatingFilter.UNRATED -> rounded == 0
+                }
+
+                val matchesGenre = filters.genre == "All" ||
+                    entry.genres.any { it.equals(filters.genre, ignoreCase = true) }
+
+                matchesQuery && matchesTime && matchesRating && matchesGenre
+            }
+
+        when (filters.sort) {
+            WatchedSort.RECENT -> entries.sortedByDescending { it.effectiveWatchedAt }
             WatchedSort.RATING -> entries.sortedWith(
                 compareByDescending<VaultEntry> { it.userRating }
-                    .thenByDescending { maxOf(it.updatedAt, it.createdAt) }
+                    .thenByDescending { it.effectiveWatchedAt }
+            )
+            WatchedSort.LOWEST_RATING -> entries.sortedWith(
+                compareBy<VaultEntry> { if (it.userRating > 0.0) it.userRating else 99.0 }
+                    .thenByDescending { it.effectiveWatchedAt }
             )
             WatchedSort.YEAR -> entries.sortedByDescending { it.releaseYear }
             WatchedSort.TITLE -> entries.sortedBy { it.title.lowercase() }
@@ -282,6 +418,13 @@ class VaultViewModel(
             val all = (state as? UiState.Success)?.data.orEmpty()
             val watched = all.filter { it.statusEnum == WatchStatus.WATCHED }
             val watchlist = all.filter { it.statusEnum == WatchStatus.WANT_TO_WATCH }
+            val nowCal = Calendar.getInstance()
+            val currentYear = nowCal.get(Calendar.YEAR)
+            val currentMonth = nowCal.get(Calendar.MONTH)
+            val monthLabel = SimpleDateFormat("MMM yyyy", Locale.US).format(Date())
+            val watchedThisMonthList = watched.filter {
+                isSameMonthYear(it.effectiveWatchedAt, currentYear, currentMonth)
+            }
             val rated = all.filter { it.userRating > 0.0 }
             val avg = if (rated.isNotEmpty()) rated.sumOf { it.userRating } / rated.size else 0.0
             val buckets = IntArray(5)
@@ -305,6 +448,10 @@ class VaultViewModel(
                 totalWatched = watched.size,
                 watchedMovies = watched.count { it.mediaTypeEnum == MediaType.MOVIE },
                 watchedSeries = watched.count { it.mediaTypeEnum == MediaType.SERIES },
+                watchedThisMonth = watchedThisMonthList.size,
+                watchedMoviesThisMonth = watchedThisMonthList.count { it.mediaTypeEnum == MediaType.MOVIE },
+                watchedSeriesThisMonth = watchedThisMonthList.count { it.mediaTypeEnum == MediaType.SERIES },
+                currentMonthLabel = monthLabel,
                 totalWatchlist = watchlist.size,
                 priorityWatchlist = watchlist.count { it.priority },
                 averageRating = avg,
@@ -336,6 +483,7 @@ class VaultViewModel(
         sectionJob?.cancel()
         sectionJob = viewModelScope.launch {
             _browseUiState.update { it.copy(isLoading = true, errorMessage = null, keyConfigured = true) }
+            _homeUiState.update { it.copy(isLoading = true) }
 
             val genresDeferred = async { tmdbRepository.fetchGenres() }
             val currentSection = _browseUiState.value.selectedSection
@@ -344,11 +492,23 @@ class VaultViewModel(
             val popularSeriesDeferred = async { tmdbRepository.fetchSection(TmdbSection.TV_POPULAR, page = 1) }
             val peopleDeferred = async { tmdbRepository.fetchTrendingPeople() }
 
+            val bollywoodDeferred = async { tmdbRepository.fetchBollywoodMovies(page = 1) }
+            val hollywoodDeferred = async { tmdbRepository.fetchHollywoodMovies(page = 1) }
+            val ottDeferred = async { tmdbRepository.fetchOttNewMovies(_homeUiState.value.selectedOttPlatform, page = 1) }
+            val classicDeferred = async { tmdbRepository.fetchClassicMovies(page = 1) }
+            val famousDeferred = async { tmdbRepository.fetchFamousMovies(page = 1) }
+
             val genresResult = genresDeferred.await().getOrNull()
             val mainResult = mainDeferred.await()
             val topMovies = topMoviesDeferred.await().getOrNull()?.items.orEmpty()
             val popularSeries = popularSeriesDeferred.await().getOrNull()?.items.orEmpty()
             val trendingPeople = peopleDeferred.await().getOrNull().orEmpty()
+
+            val bollywood = bollywoodDeferred.await().getOrNull().orEmpty()
+            val hollywood = hollywoodDeferred.await().getOrNull().orEmpty()
+            val ottNew = ottDeferred.await().getOrNull().orEmpty()
+            val classic = classicDeferred.await().getOrNull().orEmpty()
+            val famous = famousDeferred.await().getOrNull().orEmpty()
 
             mainResult.onSuccess { pageRes ->
                 val hero = pageRes.items.firstOrNull { it.backdropUrl.isNotBlank() }
@@ -372,6 +532,20 @@ class VaultViewModel(
                         totalPages = pageRes.totalPages
                     )
                 }
+
+                _homeUiState.update { state ->
+                    state.copy(
+                        isLoading = false,
+                        isLiveTmdb = true,
+                        featuredTitle = hero,
+                        bollywoodMovies = bollywood.ifEmpty { state.bollywoodMovies },
+                        hollywoodMovies = hollywood.ifEmpty { state.hollywoodMovies },
+                        ottNewMovies = ottNew.ifEmpty { state.ottNewMovies },
+                        classicMovies = classic.ifEmpty { state.classicMovies },
+                        famousMovies = famous.ifEmpty { state.famousMovies },
+                        trendingPeople = trendingPeople.take(15)
+                    )
+                }
             }.onFailure { err ->
                 Log.w(TAG, "TMDB initial load failed, using curated fallback", err)
                 _browseUiState.update { state ->
@@ -381,8 +555,32 @@ class VaultViewModel(
                         errorMessage = "TMDB live sync unavailable (${err.localizedMessage ?: "check TMDB_API_KEY"}). Showing curated library."
                     )
                 }
+                _homeUiState.update { it.copy(isLoading = false, isLiveTmdb = false) }
                 refreshOfflineFilteredBrowse()
             }
+        }
+    }
+
+    fun selectOttPlatform(platform: OttPlatform) {
+        _homeUiState.update { it.copy(selectedOttPlatform = platform) }
+        if (!tmdbRepository.hasConfiguredApiKey() || !_homeUiState.value.isLiveTmdb) {
+            return
+        }
+        ottJob?.cancel()
+        ottJob = viewModelScope.launch {
+            _homeUiState.update { it.copy(isLoadingOtt = true) }
+            tmdbRepository.fetchOttNewMovies(platform, page = 1)
+                .onSuccess { list ->
+                    _homeUiState.update { state ->
+                        state.copy(
+                            isLoadingOtt = false,
+                            ottNewMovies = list.ifEmpty { state.ottNewMovies }
+                        )
+                    }
+                }
+                .onFailure {
+                    _homeUiState.update { it.copy(isLoadingOtt = false) }
+                }
         }
     }
 
@@ -747,12 +945,37 @@ class VaultViewModel(
         _watchlistSort.value = sort
     }
 
+    fun updateWatchedSearchQuery(query: String) {
+        _watchedSearchQuery.value = query
+    }
+
     fun updateWatchedFilter(filter: MediaFilter) {
         _watchedFilter.value = filter
     }
 
+    fun updateWatchedTimeFilter(filter: WatchedTimeFilter) {
+        _watchedTimeFilter.value = filter
+    }
+
+    fun updateWatchedRatingFilter(filter: WatchedRatingFilter) {
+        _watchedRatingFilter.value = filter
+    }
+
+    fun updateWatchedGenreFilter(genre: String) {
+        _watchedGenreFilter.value = genre
+    }
+
     fun updateWatchedSort(sort: WatchedSort) {
         _watchedSort.value = sort
+    }
+
+    fun resetWatchedFilters() {
+        _watchedSearchQuery.value = ""
+        _watchedFilter.value = MediaFilter.ALL
+        _watchedTimeFilter.value = WatchedTimeFilter.ALL_TIME
+        _watchedRatingFilter.value = WatchedRatingFilter.ALL
+        _watchedGenreFilter.value = "All"
+        _watchedSort.value = WatchedSort.RECENT
     }
 
     fun updateReviewsFilter(filter: MediaFilter) {
@@ -876,6 +1099,55 @@ class VaultViewModel(
         }
     }
 
+    fun markSeenWithDetails(
+        catalogTitle: CatalogTitle?,
+        existingEntry: VaultEntry?,
+        rating: Int,
+        reviewTitle: String,
+        watchedAtMillis: Long,
+        onComplete: () -> Unit = {}
+    ) {
+        val targetId = existingEntry?.id ?: catalogTitle?.id ?: return
+        val displayName = existingEntry?.title ?: catalogTitle?.title ?: "Title"
+        val cleanRating = rating.coerceIn(0, 10)
+        viewModelScope.launch {
+            _isMutating.value = true
+            val result = if (existingEntry != null) {
+                repository.saveReviewAndRating(
+                    catalogTitle = catalogTitle,
+                    existingEntry = existingEntry,
+                    entryId = existingEntry.id,
+                    status = WatchStatus.WATCHED,
+                    userRating = if (cleanRating > 0) cleanRating.toDouble() else existingEntry.userRating,
+                    reviewTitle = reviewTitle.ifBlank { existingEntry.reviewTitle },
+                    reviewBody = existingEntry.reviewBody,
+                    favoriteQuote = existingEntry.favoriteQuote,
+                    containsSpoilers = existingEntry.containsSpoilers,
+                    watchedAt = watchedAtMillis
+                )
+            } else if (catalogTitle != null) {
+                repository.upsertFromCatalog(
+                    catalogTitle = catalogTitle,
+                    targetStatus = WatchStatus.WATCHED,
+                    isPriority = false,
+                    userRating = cleanRating.toDouble(),
+                    reviewTitle = reviewTitle,
+                    watchedAt = watchedAtMillis
+                ).map { Unit }
+            } else {
+                Result.failure(IllegalStateException("Missing title"))
+            }
+            _isMutating.value = false
+            result.onSuccess {
+                val ratingNote = if (cleanRating > 0) " · $cleanRating/10 (${RatingScale.labelFor(cleanRating)})" else ""
+                _snackbarEvents.tryEmit("Marked \"$displayName\" as Seen$ratingNote")
+                onComplete()
+            }.onFailure { e ->
+                _snackbarEvents.tryEmit(e.localizedMessage ?: "Failed to save watched entry")
+            }
+        }
+    }
+
     fun saveReviewAndRating(
         catalogTitle: CatalogTitle?,
         existingEntry: VaultEntry?,
@@ -886,6 +1158,7 @@ class VaultViewModel(
         reviewBody: String,
         favoriteQuote: String,
         containsSpoilers: Boolean,
+        watchedAt: Long? = null,
         onComplete: () -> Unit = {}
     ) {
         viewModelScope.launch {
@@ -899,7 +1172,8 @@ class VaultViewModel(
                 reviewTitle = reviewTitle,
                 reviewBody = reviewBody,
                 favoriteQuote = favoriteQuote,
-                containsSpoilers = containsSpoilers
+                containsSpoilers = containsSpoilers,
+                watchedAt = watchedAt
             )
             _isMutating.value = false
             result.onSuccess {
@@ -986,6 +1260,18 @@ class VaultViewModel(
             MediaFilter.MOVIES -> filter { it.mediaTypeEnum == MediaType.MOVIE }
             MediaFilter.SERIES -> filter { it.mediaTypeEnum == MediaType.SERIES }
         }
+    }
+
+    private fun isSameMonthYear(timestamp: Long, targetYear: Int, targetMonth: Int): Boolean {
+        if (timestamp <= 0L) return false
+        val cal = Calendar.getInstance().apply { timeInMillis = timestamp }
+        return cal.get(Calendar.YEAR) == targetYear && cal.get(Calendar.MONTH) == targetMonth
+    }
+
+    private fun isSameYear(timestamp: Long, targetYear: Int): Boolean {
+        if (timestamp <= 0L) return false
+        val cal = Calendar.getInstance().apply { timeInMillis = timestamp }
+        return cal.get(Calendar.YEAR) == targetYear
     }
 
     private companion object {

@@ -85,6 +85,12 @@ interface TmdbApiService {
         @Query("sort_by") sortBy: String = "popularity.desc",
         @Query("vote_count.gte") minVotes: Int? = null,
         @Query("primary_release_year") year: Int? = null,
+        @Query("with_original_language") withOriginalLanguage: String? = null,
+        @Query("with_origin_country") withOriginCountry: String? = null,
+        @Query("primary_release_date.gte") releaseDateGte: String? = null,
+        @Query("primary_release_date.lte") releaseDateLte: String? = null,
+        @Query("with_watch_providers") withWatchProviders: String? = null,
+        @Query("watch_region") watchRegion: String? = null,
         @Query("language") language: String = "en-US"
     ): TmdbPagedResponse<TmdbMediaDto>
 

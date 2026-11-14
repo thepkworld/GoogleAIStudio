@@ -49,6 +49,50 @@ enum class SearchScope(val label: String) {
     COLLECTIONS("Collections")
 }
 
+enum class OttPlatform(val label: String, val providerIds: String, val region: String) {
+    ALL("All OTT", "8|119|337|350|1899", "US"),
+    NETFLIX("Netflix", "8", "US"),
+    PRIME("Prime Video", "119", "US"),
+    DISNEY("Disney+", "337", "US"),
+    APPLE_TV("Apple TV+", "350", "US"),
+    MAX("Max", "1899", "US"),
+    HOTSTAR("JioHotstar", "122", "IN")
+}
+
+object RatingScale {
+    val allLevels: List<Pair<Int, String>> = listOf(
+        10 to "Masterpiece",
+        9 to "Excellent",
+        8 to "Great",
+        7 to "Very Good",
+        6 to "Good",
+        5 to "Average",
+        4 to "Mediocre",
+        3 to "Bad",
+        2 to "Very Bad",
+        1 to "Awful"
+    )
+
+    fun labelFor(score: Int): String = when (score) {
+        10 -> "Masterpiece"
+        9 -> "Excellent"
+        8 -> "Great"
+        7 -> "Very Good"
+        6 -> "Good"
+        5 -> "Average"
+        4 -> "Mediocre"
+        3 -> "Bad"
+        2 -> "Very Bad"
+        1 -> "Awful"
+        else -> "Unrated"
+    }
+
+    fun labelFor(score: Double): String {
+        if (score <= 0.0) return "Unrated"
+        return labelFor(kotlin.math.round(score).toInt().coerceIn(1, 10))
+    }
+}
+
 data class CastMember(
     val actor: String,
     val role: String,
@@ -234,6 +278,7 @@ data class VaultEntry(
     val episodesWatched: Long = 0L,
     val totalEpisodes: Long = 0L,
     val customTitle: Boolean = false,
+    val watchedAt: Long = 0L,
     val createdAt: Long = 0L,
     val updatedAt: Long = 0L
 ) {
@@ -245,4 +290,11 @@ data class VaultEntry(
 
     val hasReview: Boolean
         get() = reviewBody.isNotBlank() || reviewTitle.isNotBlank() || favoriteQuote.isNotBlank()
+
+    val effectiveWatchedAt: Long
+        get() = when {
+            watchedAt > 0L -> watchedAt
+            updatedAt > 0L -> updatedAt
+            else -> createdAt
+        }
 }

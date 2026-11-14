@@ -109,4 +109,68 @@ class VaultRepositoryTest {
         assertNull(repository.getVaultEntry(createdId).getOrNull())
         assertFalse(repository.observeVaultEntries().first().any { it.id == createdId })
     }
+
+    @Test
+    fun ratingScale_returnsExactLabelsForOneThroughTen() {
+        val expected = mapOf(
+            10 to "Masterpiece",
+            9 to "Excellent",
+            8 to "Great",
+            7 to "Very Good",
+            6 to "Good",
+            5 to "Average",
+            4 to "Mediocre",
+            3 to "Bad",
+            2 to "Very Bad",
+            1 to "Awful",
+            0 to "Unrated"
+        )
+        expected.forEach { (score, label) ->
+            assertEquals(label, com.example.data.model.RatingScale.labelFor(score))
+        }
+        assertEquals("Masterpiece", com.example.data.model.RatingScale.labelFor(9.8))
+        assertEquals("Good", com.example.data.model.RatingScale.labelFor(6.0))
+        assertEquals("Unrated", com.example.data.model.RatingScale.labelFor(0.0))
+    }
+
+    @Test
+    fun watchedAt_andSeriesEpisodes_persistAcrossMarkSeenFlows() = runTest {
+        val series = CatalogRepository.allTitles().first { it.mediaType == MediaType.SERIES && it.totalEpisodes > 0 }
+        val customWatchedDate = 1735689600000L // Jan 1, 2025 UTC
+
+        repository.upsertFromCatalog(series, WatchStatus.WANT_TO_WATCH, isPriority = true)
+        val existing = repository.getVaultEntry(series.id).getOrNull()!!
+        assertEquals(0L, existing.episodesWatched)
+
+        val res = repository.saveReviewAndRating(
+            catalogTitle = series,
+            existingEntry = existing,
+            entryId = series.id,
+            status = WatchStatus.WATCHED,
+            userRating = 8.0,
+            reviewTitle = "Gripping season",
+            reviewBody = "",
+            favoriteQuote = "",
+            containsSpoilers = false,
+            watchedAt = customWatchedDate
+        )
+        assertTrue(res.isSuccess)
+
+        val updated = repository.getVaultEntry(series.id).getOrNull()!!
+        assertEquals(WatchStatus.WATCHED, updated.statusEnum)
+        assertFalse(updated.priority)
+        assertEquals(series.totalEpisodes.toLong(), updated.episodesWatched)
+        assertEquals(customWatchedDate, updated.watchedAt)
+        assertEquals(customWatchedDate, updated.effectiveWatchedAt)
+        assertEquals(8.0, updated.userRating, 0.001)
+    }
+
+    @Test
+    fun datePickerHelpers_roundTripLocalDayCleanly() {
+        val today = com.example.ui.components.todayLocalNoonMillis()
+        val utc = com.example.ui.components.localMillisToUtcDatePickerMillis(today)
+        val backToLocal = com.example.ui.components.utcDatePickerMillisToLocalNoonMillis(utc)
+        assertTrue(com.example.ui.components.isSameLocalDay(today, backToLocal))
+        assertFalse(com.example.ui.components.isSameLocalDay(today, today - 3L * 24L * 60L * 60L * 1000L))
+    }
 }

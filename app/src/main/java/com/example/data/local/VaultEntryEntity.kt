@@ -30,6 +30,7 @@ data class VaultEntryEntity(
     val episodesWatched: Long,
     val totalEpisodes: Long,
     val customTitle: Boolean,
+    val watchedAt: Long = 0L,
     val createdAt: Long,
     val updatedAt: Long
 ) {
@@ -58,6 +59,7 @@ data class VaultEntryEntity(
         episodesWatched = episodesWatched,
         totalEpisodes = totalEpisodes,
         customTitle = customTitle,
+        watchedAt = watchedAt,
         createdAt = createdAt,
         updatedAt = updatedAt
     )
@@ -88,6 +90,7 @@ data class VaultEntryEntity(
             episodesWatched = entry.episodesWatched,
             totalEpisodes = entry.totalEpisodes,
             customTitle = entry.customTitle,
+            watchedAt = entry.watchedAt,
             createdAt = entry.createdAt,
             updatedAt = entry.updatedAt
         )

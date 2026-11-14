@@ -9,6 +9,7 @@ import com.example.data.model.CrewMember
 import com.example.data.model.DiscoverSort
 import com.example.data.model.EpisodeItem
 import com.example.data.model.MediaType
+import com.example.data.model.OttPlatform
 import com.example.data.model.PersonDetail
 import com.example.data.model.PersonSummary
 import com.example.data.model.SearchScope
@@ -27,6 +28,8 @@ import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
@@ -176,6 +179,79 @@ class TmdbRepository(
                 mapMediaDto(dto, mediaType).also { cacheTitle(it) }
             }
             Result.success(TmdbPageResult(mapped, response.page, response.totalPages))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun fetchBollywoodMovies(page: Int = 1): Result<List<CatalogTitle>> =
+        discoverMovieRail {
+            apiService.discoverMovies(
+                page = page,
+                sortBy = "popularity.desc",
+                minVotes = 15,
+                withOriginalLanguage = "hi",
+                withOriginCountry = "IN"
+            )
+        }
+
+    suspend fun fetchHollywoodMovies(page: Int = 1): Result<List<CatalogTitle>> =
+        discoverMovieRail {
+            apiService.discoverMovies(
+                page = page,
+                sortBy = "popularity.desc",
+                minVotes = 200,
+                withOriginalLanguage = "en",
+                withOriginCountry = "US"
+            )
+        }
+
+    suspend fun fetchOttNewMovies(platform: OttPlatform, page: Int = 1): Result<List<CatalogTitle>> =
+        discoverMovieRail {
+            val todayIso = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+            apiService.discoverMovies(
+                page = page,
+                sortBy = "primary_release_date.desc",
+                minVotes = 20,
+                releaseDateLte = todayIso,
+                withWatchProviders = platform.providerIds,
+                watchRegion = platform.region
+            )
+        }
+
+    suspend fun fetchClassicMovies(page: Int = 1): Result<List<CatalogTitle>> =
+        discoverMovieRail {
+            apiService.discoverMovies(
+                page = page,
+                sortBy = "vote_average.desc",
+                minVotes = 1500,
+                releaseDateLte = "1999-12-31"
+            )
+        }
+
+    suspend fun fetchFamousMovies(page: Int = 1): Result<List<CatalogTitle>> =
+        discoverMovieRail {
+            apiService.discoverMovies(
+                page = page,
+                sortBy = "vote_count.desc",
+                minVotes = 5000
+            )
+        }
+
+    private suspend fun discoverMovieRail(
+        block: suspend () -> TmdbPagedResponse<TmdbMediaDto>
+    ): Result<List<CatalogTitle>> {
+        if (!hasConfiguredApiKey()) {
+            return Result.failure(IllegalStateException("TMDB API key not configured"))
+        }
+        return try {
+            val response = block()
+            val mapped = response.results.map { dto ->
+                mapMediaDto(dto, MediaType.MOVIE).also { cacheTitle(it) }
+            }
+            Result.success(mapped)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

@@ -175,20 +175,7 @@ fun BrowseScreen(
             }
         }
 
-        // Featured Hero Banner (hidden during active search to keep results focused)
-        if (searchQuery.isBlank()) {
-            item(key = "hero_banner") {
-                FeaturedCinemaHero(
-                    title = featuredTitle,
-                    isLiveTmdb = browseState.isLiveTmdb,
-                    vaultEntry = vaultById[featuredTitle.id],
-                    onTitleClick = { onTitleClick(featuredTitle.id) },
-                    onQuickWatchlist = { onQuickWatchlist(featuredTitle) }
-                )
-            }
-        }
-
-        // Search & Filter Controls
+        // Search & Filter Controls (Top-first for dedicated Search tab)
         item(key = "search_controls") {
             Column(
                 modifier = Modifier.padding(horizontal = 16.dp),
@@ -1213,7 +1200,7 @@ private fun CatalogListCard(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = if (isWatchlist) "Queued" else "Watchlist",
+                                text = if (isWatchlist) "In Bucket" else "BucketList",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = if (isWatchlist) CinemaGold else CinemaAlabaster
                             )

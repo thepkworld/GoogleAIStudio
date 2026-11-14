@@ -33,6 +33,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Bookmark
+import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.CollectionsBookmark
 import androidx.compose.material.icons.rounded.DeleteOutline
@@ -46,6 +47,7 @@ import androidx.compose.material.icons.rounded.RateReview
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.Today
 import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -58,8 +60,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -67,7 +67,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableDoubleStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -87,11 +88,18 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.data.model.CatalogTitle
 import com.example.data.model.MediaType
+import com.example.data.model.RatingScale
 import com.example.data.model.VaultEntry
 import com.example.data.model.WatchStatus
 import com.example.ui.components.CinemaBackdropImage
 import com.example.ui.components.CinemaPosterArtwork
 import com.example.ui.components.RatingPill
+import com.example.ui.components.TenStarRatingBar
+import com.example.ui.components.WatchedDatePickerDialog
+import com.example.ui.components.formatWatchedDate
+import com.example.ui.components.isSameLocalDay
+import com.example.ui.components.normalizeToLocalNoonMillis
+import com.example.ui.components.todayLocalNoonMillis
 import com.example.ui.theme.CinemaAlabaster
 import com.example.ui.theme.CinemaBorderSubtle
 import com.example.ui.theme.CinemaCrimson
@@ -128,7 +136,8 @@ fun TitleDetailScreen(
         reviewTitle: String,
         reviewBody: String,
         favoriteQuote: String,
-        containsSpoilers: Boolean
+        containsSpoilers: Boolean,
+        watchedAt: Long?
     ) -> Unit,
     onDeleteEntry: () -> Unit
 ) {
@@ -153,9 +162,17 @@ fun TitleDetailScreen(
         ?: vaultEntry?.totalEpisodes?.toInt() ?: 0
 
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showDetailDatePicker by remember { mutableStateOf(false) }
 
-    var draftRating by remember(vaultEntry?.id, vaultEntry?.userRating) {
-        mutableDoubleStateOf(vaultEntry?.userRating ?: 0.0)
+    var draftStars by remember(vaultEntry?.id, vaultEntry?.userRating) {
+        val initial = vaultEntry?.userRating ?: 0.0
+        mutableIntStateOf(if (initial > 0.0) initial.roundToInt().coerceIn(1, 10) else 0)
+    }
+    var draftWatchedAt by remember(vaultEntry?.id, vaultEntry?.watchedAt) {
+        val existing = vaultEntry?.effectiveWatchedAt ?: 0L
+        mutableLongStateOf(
+            if (existing > 0L) normalizeToLocalNoonMillis(existing) else todayLocalNoonMillis()
+        )
     }
     var draftReviewTitle by remember(vaultEntry?.id, vaultEntry?.reviewTitle) {
         mutableStateOf(vaultEntry?.reviewTitle.orEmpty())
@@ -364,7 +381,7 @@ fun TitleDetailScreen(
                             Icon(Icons.Rounded.Bookmark, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = if (isWatchlist) "In Watchlist" else "Want to Watch",
+                                text = if (isWatchlist) "In BucketList" else "BucketList",
                                 style = MaterialTheme.typography.labelLarge,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
@@ -391,7 +408,7 @@ fun TitleDetailScreen(
                             Icon(Icons.Rounded.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = if (isWatched) "Watched" else "Mark Watched",
+                                text = if (isWatched) "Watched" else "Mark Seen",
                                 style = MaterialTheme.typography.labelLarge,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
@@ -957,61 +974,69 @@ fun TitleDetailScreen(
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text("Your Rating & Review", style = MaterialTheme.typography.headlineSmall, color = CinemaAlabaster)
                             }
-                            Text(
-                                text = if (draftRating > 0.0) "${String.format(Locale.US, "%.1f", draftRating)} / 10" else "Unrated",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = CinemaGold,
-                                fontWeight = FontWeight.Bold
-                            )
+                            if (draftStars > 0) {
+                                TextButton(onClick = { draftStars = 0 }) {
+                                    Text("Clear", color = CinemaSilver, style = MaterialTheme.typography.labelMedium)
+                                }
+                            }
                         }
 
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Slider(
-                                value = draftRating.toFloat(),
-                                onValueChange = { raw -> draftRating = ((raw * 2f).roundToInt() / 2.0).coerceIn(0.0, 10.0) },
-                                valueRange = 0f..10f,
-                                steps = 19,
-                                colors = SliderDefaults.colors(
-                                    thumbColor = CinemaGold,
-                                    activeTrackColor = CinemaGold,
-                                    inactiveTrackColor = CinemaSlateElevated
-                                ),
-                                modifier = Modifier.testTag("detail_rating_slider")
-                            )
+                        TenStarRatingBar(
+                            selectedStars = draftStars,
+                            onStarSelected = { star -> draftStars = star }
+                        )
 
+                        // Watched Date Selector (Today + Calendar)
+                        val isToday = isSameLocalDay(draftWatchedAt, todayLocalNoonMillis())
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                listOf(0.0, 5.0, 7.5, 8.5, 9.5, 10.0).forEach { preset ->
-                                    val active = kotlin.math.abs(draftRating - preset) < 0.05
-                                    Surface(
-                                        color = if (active) CinemaGold else CinemaSlateElevated,
-                                        shape = RoundedCornerShape(8.dp),
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .clickable { draftRating = preset }
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            if (preset > 0.0) {
-                                                Icon(
-                                                    imageVector = Icons.Rounded.Star,
-                                                    contentDescription = null,
-                                                    tint = if (active) CinemaObsidian else CinemaGold,
-                                                    modifier = Modifier.size(12.dp)
-                                                )
-                                                Spacer(Modifier.width(3.dp))
-                                            }
-                                            Text(
-                                                text = if (preset == 0.0) "Clear" else String.format(Locale.US, "%.1f", preset),
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = if (active) CinemaObsidian else CinemaSilver
-                                            )
-                                        }
-                                    }
+                                Text("Watched Date", style = MaterialTheme.typography.titleSmall, color = CinemaAlabaster)
+                                Text(
+                                    text = formatWatchedDate(draftWatchedAt),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = CinemaGold,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = { draftWatchedAt = todayLocalNoonMillis() },
+                                    shape = RoundedCornerShape(12.dp),
+                                    border = BorderStroke(1.dp, if (isToday) CinemaGold else CinemaBorderSubtle),
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        containerColor = if (isToday) CinemaGold.copy(alpha = 0.16f) else CinemaSlateElevated,
+                                        contentColor = if (isToday) CinemaGold else CinemaAlabaster
+                                    ),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(46.dp)
+                                ) {
+                                    Icon(Icons.Rounded.Today, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("Today", style = MaterialTheme.typography.labelLarge)
+                                }
+                                OutlinedButton(
+                                    onClick = { showDetailDatePicker = true },
+                                    shape = RoundedCornerShape(12.dp),
+                                    border = BorderStroke(1.dp, if (!isToday) CinemaGold else CinemaBorderSubtle),
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        containerColor = if (!isToday) CinemaGold.copy(alpha = 0.16f) else CinemaSlateElevated,
+                                        contentColor = if (!isToday) CinemaGold else CinemaAlabaster
+                                    ),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(46.dp)
+                                ) {
+                                    Icon(Icons.Rounded.CalendarMonth, contentDescription = "Pick watched date", modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("Calendar", style = MaterialTheme.typography.labelLarge)
                                 }
                             }
                         }
@@ -1107,7 +1132,15 @@ fun TitleDetailScreen(
                         Button(
                             onClick = {
                                 val targetStatus = vaultEntry?.statusEnum ?: WatchStatus.WATCHED
-                                onSaveReview(targetStatus, draftRating, draftReviewTitle, draftReviewBody, draftQuote, draftSpoilers)
+                                onSaveReview(
+                                    targetStatus,
+                                    draftStars.toDouble(),
+                                    draftReviewTitle,
+                                    draftReviewBody,
+                                    draftQuote,
+                                    draftSpoilers,
+                                    if (targetStatus == WatchStatus.WATCHED) draftWatchedAt else null
+                                )
                             },
                             enabled = !isMutating,
                             shape = RoundedCornerShape(14.dp),
@@ -1118,7 +1151,7 @@ fun TitleDetailScreen(
                                 .testTag("save_review_button")
                         ) {
                             Text(
-                                text = if (vaultEntry == null) "Save to Watched & Publish Review" else "Save Rating & Review",
+                                text = if (vaultEntry == null) "Save to Library & Publish Review" else "Save Rating & Review",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
@@ -1127,6 +1160,17 @@ fun TitleDetailScreen(
                 }
             }
         }
+    }
+
+    if (showDetailDatePicker) {
+        WatchedDatePickerDialog(
+            initialLocalMillis = draftWatchedAt,
+            onDismiss = { showDetailDatePicker = false },
+            onDateSelected = { pickedLocal ->
+                draftWatchedAt = pickedLocal
+                showDetailDatePicker = false
+            }
+        )
     }
 
     if (showDeleteDialog && vaultEntry != null) {

@@ -41,10 +41,16 @@ class VaultRepository(
         reviewTitle: String = "",
         reviewBody: String = "",
         favoriteQuote: String = "",
-        containsSpoilers: Boolean = false
+        containsSpoilers: Boolean = false,
+        watchedAt: Long? = null
     ): Result<String> {
         return try {
             val now = System.currentTimeMillis()
+            val resolvedWatchedAt = when {
+                watchedAt != null && watchedAt > 0L -> watchedAt
+                targetStatus == WatchStatus.WATCHED -> now
+                else -> 0L
+            }
             val existing = dao.getEntryById(catalogTitle.id)
             if (existing == null) {
                 val episodesWatched = if (targetStatus == WatchStatus.WATCHED && catalogTitle.mediaType == MediaType.SERIES) {
@@ -77,11 +83,17 @@ class VaultRepository(
                     episodesWatched = episodesWatched,
                     totalEpisodes = catalogTitle.totalEpisodes.toLong(),
                     customTitle = false,
+                    watchedAt = resolvedWatchedAt,
                     createdAt = now,
                     updatedAt = now
                 )
                 dao.upsertEntry(entity)
             } else {
+                val nextWatchedAt = when {
+                    watchedAt != null && watchedAt > 0L -> watchedAt
+                    targetStatus == WatchStatus.WATCHED && existing.watchedAt <= 0L -> now
+                    else -> existing.watchedAt
+                }
                 val updated = existing.copy(
                     status = targetStatus.value,
                     priority = if (targetStatus == WatchStatus.WATCHED) false else isPriority,
@@ -91,6 +103,11 @@ class VaultRepository(
                     directorOrCreator = existing.directorOrCreator.ifBlank { catalogTitle.directorOrCreator.take(120) },
                     runtimeOrSeasons = existing.runtimeOrSeasons.ifBlank { catalogTitle.runtimeOrSeasons.take(60) },
                     totalEpisodes = maxOf(existing.totalEpisodes, catalogTitle.totalEpisodes.toLong()),
+                    userRating = if (userRating > 0.0) userRating.coerceIn(0.0, 10.0) else existing.userRating,
+                    reviewTitle = if (reviewTitle.isNotBlank()) reviewTitle.trim().take(160) else existing.reviewTitle,
+                    reviewBody = if (reviewBody.isNotBlank()) reviewBody.trim().take(4000) else existing.reviewBody,
+                    favoriteQuote = if (favoriteQuote.isNotBlank()) favoriteQuote.trim().take(400) else existing.favoriteQuote,
+                    watchedAt = nextWatchedAt,
                     updatedAt = now
                 )
                 dao.upsertEntry(updated)
@@ -119,7 +136,8 @@ class VaultRepository(
         reviewBody: String = "",
         favoriteQuote: String = "",
         containsSpoilers: Boolean = false,
-        isPriority: Boolean = false
+        isPriority: Boolean = false,
+        watchedAt: Long? = null
     ): Result<String> {
         return try {
             val now = System.currentTimeMillis()
@@ -129,6 +147,11 @@ class VaultRepository(
                 clampedTotalEpisodes
             } else {
                 0L
+            }
+            val resolvedWatchedAt = when {
+                watchedAt != null && watchedAt > 0L -> watchedAt
+                status == WatchStatus.WATCHED -> now
+                else -> 0L
             }
             val entity = VaultEntryEntity(
                 id = entryId,
@@ -155,6 +178,7 @@ class VaultRepository(
                 episodesWatched = episodesWatched,
                 totalEpisodes = clampedTotalEpisodes,
                 customTitle = true,
+                watchedAt = resolvedWatchedAt,
                 createdAt = now,
                 updatedAt = now
             )
@@ -172,17 +196,25 @@ class VaultRepository(
         status: WatchStatus,
         isPriority: Boolean,
         episodesWatched: Long,
-        rewatchCount: Long
+        rewatchCount: Long,
+        watchedAt: Long? = null
     ): Result<Unit> {
         return try {
+            val now = System.currentTimeMillis()
             val existing = dao.getEntryById(entryId)
                 ?: return Result.failure(IllegalStateException("Entry not found in Vault"))
+            val nextWatchedAt = when {
+                watchedAt != null && watchedAt > 0L -> watchedAt
+                status == WatchStatus.WATCHED && existing.watchedAt <= 0L -> now
+                else -> existing.watchedAt
+            }
             val updated = existing.copy(
                 status = status.value,
                 priority = if (status == WatchStatus.WATCHED) false else isPriority,
                 episodesWatched = episodesWatched.coerceIn(0L, 5000L),
                 rewatchCount = rewatchCount.coerceIn(0L, 1000L),
-                updatedAt = System.currentTimeMillis()
+                watchedAt = nextWatchedAt,
+                updatedAt = now
             )
             dao.upsertEntry(updated)
             Result.success(Unit)
@@ -202,7 +234,8 @@ class VaultRepository(
         reviewTitle: String,
         reviewBody: String,
         favoriteQuote: String,
-        containsSpoilers: Boolean
+        containsSpoilers: Boolean,
+        watchedAt: Long? = null
     ): Result<Unit> {
         return try {
             val now = System.currentTimeMillis()
@@ -212,6 +245,11 @@ class VaultRepository(
                     catalogTitle.totalEpisodes.toLong()
                 } else {
                     0L
+                }
+                val resolvedWatchedAt = when {
+                    watchedAt != null && watchedAt > 0L -> watchedAt
+                    status == WatchStatus.WATCHED -> now
+                    else -> 0L
                 }
                 val entity = VaultEntryEntity(
                     id = catalogTitle.id,
@@ -238,6 +276,7 @@ class VaultRepository(
                     episodesWatched = episodesWatched,
                     totalEpisodes = catalogTitle.totalEpisodes.toLong(),
                     customTitle = false,
+                    watchedAt = resolvedWatchedAt,
                     createdAt = now,
                     updatedAt = now
                 )
@@ -245,8 +284,25 @@ class VaultRepository(
             } else {
                 val base = currentDb ?: existingEntry?.let { VaultEntryEntity.fromDomain(it) }
                     ?: return Result.failure(IllegalStateException("Unable to save review for missing title"))
+                val nextWatchedAt = when {
+                    watchedAt != null && watchedAt > 0L -> watchedAt
+                    status == WatchStatus.WATCHED && base.watchedAt <= 0L -> now
+                    else -> base.watchedAt
+                }
+                val nextEpisodesWatched = if (
+                    status == WatchStatus.WATCHED &&
+                    base.mediaType == MediaType.SERIES.value &&
+                    base.totalEpisodes > 0L &&
+                    base.episodesWatched == 0L
+                ) {
+                    base.totalEpisodes
+                } else {
+                    base.episodesWatched
+                }
                 val updated = base.copy(
                     status = status.value,
+                    priority = if (status == WatchStatus.WATCHED) false else base.priority,
+                    episodesWatched = nextEpisodesWatched,
                     userRating = userRating.coerceIn(0.0, 10.0),
                     reviewTitle = reviewTitle.trim().take(160),
                     reviewBody = reviewBody.trim().take(4000),
@@ -255,6 +311,7 @@ class VaultRepository(
                     tmdbId = base.tmdbId ?: catalogTitle?.tmdbId,
                     posterUrl = base.posterUrl.ifBlank { catalogTitle?.posterUrl.orEmpty() },
                     backdropUrl = base.backdropUrl.ifBlank { catalogTitle?.backdropUrl.orEmpty() },
+                    watchedAt = nextWatchedAt,
                     updatedAt = now
                 )
                 dao.upsertEntry(updated)

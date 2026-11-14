@@ -22,21 +22,24 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.outlined.BookmarkBorder
-import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.Explore
-import androidx.compose.material.icons.outlined.RateReview
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.VideoLibrary
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Bookmark
-import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material.icons.rounded.Explore
+import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.MovieFilter
 import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.RateReview
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.VideoLibrary
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -78,12 +81,17 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.R
+import com.example.data.model.CatalogTitle
+import com.example.data.model.MediaType
+import com.example.data.model.VaultEntry
 import com.example.data.model.WatchStatus
 import com.example.data.repository.VaultRepository
 import com.example.data.tmdb.TmdbRepository
+import com.example.ui.components.MarkSeenDialog
 import com.example.ui.screens.AddCustomTitleSheet
 import com.example.ui.screens.BrowseScreen
 import com.example.ui.screens.CollectionDetailScreen
+import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.PersonDetailScreen
 import com.example.ui.screens.ReviewsScreen
 import com.example.ui.screens.SeasonEpisodesSheet
@@ -99,6 +107,7 @@ import com.example.ui.theme.CinemaObsidian
 import com.example.ui.theme.CinemaSilver
 import com.example.ui.theme.CinemaSlate
 import com.example.ui.theme.CinemaVelvet
+import kotlin.math.roundToInt
 
 private enum class VaultTab(
     val title: String,
@@ -106,16 +115,22 @@ private enum class VaultTab(
     val unselectedIcon: ImageVector,
     val tag: String
 ) {
-    BROWSE("Browse", Icons.Rounded.Explore, Icons.Outlined.Explore, "nav_browse"),
-    WATCHLIST("Watchlist", Icons.Rounded.Bookmark, Icons.Outlined.BookmarkBorder, "nav_watchlist"),
-    WATCHED("Watched", Icons.Rounded.CheckCircle, Icons.Outlined.CheckCircle, "nav_watched"),
-    REVIEWS("Reviews", Icons.Rounded.RateReview, Icons.Outlined.RateReview, "nav_reviews")
+    HOME("Home", Icons.Rounded.Home, Icons.Outlined.Home, "nav_home"),
+    SEARCH("Search", Icons.Rounded.Search, Icons.Outlined.Search, "nav_search"),
+    BUCKET_LIST("BucketList", Icons.Rounded.Bookmark, Icons.Outlined.BookmarkBorder, "nav_bucketlist"),
+    LIBRARY("Library", Icons.Rounded.VideoLibrary, Icons.Outlined.VideoLibrary, "nav_library")
 }
+
+private data class PendingMarkSeen(
+    val catalogTitle: CatalogTitle?,
+    val existingEntry: VaultEntry?
+)
 
 private const val ROUTE_MAIN = "main"
 private const val ROUTE_DETAIL = "detail/{titleId}"
 private const val ROUTE_PERSON = "person/{personId}"
 private const val ROUTE_COLLECTION = "collection/{collectionId}"
+private const val ROUTE_REVIEWS = "reviews"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -135,13 +150,15 @@ fun CineVaultApp() {
     )
 
     val navController = rememberNavController()
-    var selectedTab by rememberSaveable { mutableStateOf(VaultTab.BROWSE) }
+    var selectedTab by rememberSaveable { mutableStateOf(VaultTab.HOME) }
     var showAddCustomSheet by remember { mutableStateOf(false) }
     var showSeasonSheet by remember { mutableStateOf(false) }
+    var pendingMarkSeen by remember { mutableStateOf<PendingMarkSeen?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     val vaultState by vaultViewModel.vaultEntriesState.collectAsStateWithLifecycle()
     val vaultById by vaultViewModel.vaultById.collectAsStateWithLifecycle()
+    val homeUiState by vaultViewModel.homeUiState.collectAsStateWithLifecycle()
     val browseUiState by vaultViewModel.browseUiState.collectAsStateWithLifecycle()
     val browseQuery by vaultViewModel.browseQuery.collectAsStateWithLifecycle()
     val browseMediaFilter by vaultViewModel.browseMediaFilter.collectAsStateWithLifecycle()
@@ -151,7 +168,12 @@ fun CineVaultApp() {
     val watchlistSort by vaultViewModel.watchlistSort.collectAsStateWithLifecycle()
 
     val watchedEntries by vaultViewModel.watchedEntries.collectAsStateWithLifecycle()
+    val watchedSearchQuery by vaultViewModel.watchedSearchQuery.collectAsStateWithLifecycle()
     val watchedFilter by vaultViewModel.watchedFilter.collectAsStateWithLifecycle()
+    val watchedTimeFilter by vaultViewModel.watchedTimeFilter.collectAsStateWithLifecycle()
+    val watchedRatingFilter by vaultViewModel.watchedRatingFilter.collectAsStateWithLifecycle()
+    val watchedGenreFilter by vaultViewModel.watchedGenreFilter.collectAsStateWithLifecycle()
+    val watchedAvailableGenres by vaultViewModel.watchedAvailableGenres.collectAsStateWithLifecycle()
     val watchedSort by vaultViewModel.watchedSort.collectAsStateWithLifecycle()
 
     val reviewedEntries by vaultViewModel.reviewedEntries.collectAsStateWithLifecycle()
@@ -274,6 +296,17 @@ fun CineVaultApp() {
                                     }
                                 },
                                 actions = {
+                                    IconButton(
+                                        onClick = { navController.navigate(ROUTE_REVIEWS) },
+                                        modifier = Modifier.testTag("open_reviews_journal_button")
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.RateReview,
+                                            contentDescription = "Open Reviews Journal",
+                                            tint = CinemaGold
+                                        )
+                                    }
+
                                     val isLive = browseUiState.isLiveTmdb
                                     Surface(
                                         color = if (isLive) CinemaEmerald.copy(alpha = 0.14f) else CinemaSlate,
@@ -337,9 +370,8 @@ fun CineVaultApp() {
                                     VaultTab.entries.forEach { tab ->
                                         val selected = selectedTab == tab
                                         val countBadge = when (tab) {
-                                            VaultTab.WATCHLIST -> vaultStats.totalWatchlist
-                                            VaultTab.WATCHED -> vaultStats.totalWatched
-                                            VaultTab.REVIEWS -> vaultStats.totalReviews
+                                            VaultTab.BUCKET_LIST -> vaultStats.totalWatchlist
+                                            VaultTab.LIBRARY -> vaultStats.totalWatched
                                             else -> 0
                                         }
                                         NavigationBarItem(
@@ -400,7 +432,28 @@ fun CineVaultApp() {
                             }
 
                             when (selectedTab) {
-                                VaultTab.BROWSE -> BrowseScreen(
+                                VaultTab.HOME -> HomeScreen(
+                                    homeState = homeUiState,
+                                    keyConfigured = browseUiState.keyConfigured,
+                                    errorMessage = browseUiState.errorMessage,
+                                    vaultById = vaultById,
+                                    onRefreshTmdb = vaultViewModel::refreshTmdbFeeds,
+                                    onOttPlatformSelect = vaultViewModel::selectOttPlatform,
+                                    onOpenSearch = { selectedTab = VaultTab.SEARCH },
+                                    onTitleClick = { id -> navController.navigate("detail/$id") },
+                                    onPersonClick = { pid -> navController.navigate("person/$pid") },
+                                    onQuickBucketList = { title ->
+                                        vaultViewModel.addOrMoveCatalogTitle(title, WatchStatus.WANT_TO_WATCH)
+                                    },
+                                    onMarkSeenClick = { title ->
+                                        pendingMarkSeen = PendingMarkSeen(
+                                            catalogTitle = title,
+                                            existingEntry = vaultById[title.id]
+                                        )
+                                    }
+                                )
+
+                                VaultTab.SEARCH -> BrowseScreen(
                                     browseState = browseUiState,
                                     localGenres = vaultViewModel.localGenres,
                                     searchQuery = browseQuery,
@@ -421,12 +474,15 @@ fun CineVaultApp() {
                                         vaultViewModel.addOrMoveCatalogTitle(title, WatchStatus.WANT_TO_WATCH)
                                     },
                                     onQuickWatched = { title ->
-                                        vaultViewModel.addOrMoveCatalogTitle(title, WatchStatus.WATCHED)
+                                        pendingMarkSeen = PendingMarkSeen(
+                                            catalogTitle = title,
+                                            existingEntry = vaultById[title.id]
+                                        )
                                     },
                                     onAddCustomClick = { showAddCustomSheet = true }
                                 )
 
-                                VaultTab.WATCHLIST -> WatchlistScreen(
+                                VaultTab.BUCKET_LIST -> WatchlistScreen(
                                     entries = watchlistEntries,
                                     stats = vaultStats,
                                     selectedFilter = watchlistFilter,
@@ -435,33 +491,82 @@ fun CineVaultApp() {
                                     onSortChange = vaultViewModel::updateWatchlistSort,
                                     onEntryClick = { id -> navController.navigate("detail/$id") },
                                     onTogglePriority = vaultViewModel::togglePriority,
-                                    onMarkWatched = vaultViewModel::moveToWatched,
-                                    onBrowseClick = { selectedTab = VaultTab.BROWSE }
+                                    onMarkWatched = { entry ->
+                                        pendingMarkSeen = PendingMarkSeen(
+                                            catalogTitle = vaultViewModel.resolveCatalogTitle(entry.catalogId),
+                                            existingEntry = entry
+                                        )
+                                    },
+                                    onBrowseClick = { selectedTab = VaultTab.HOME }
                                 )
 
-                                VaultTab.WATCHED -> WatchedScreen(
+                                VaultTab.LIBRARY -> WatchedScreen(
                                     entries = watchedEntries,
                                     stats = vaultStats,
+                                    searchQuery = watchedSearchQuery,
                                     selectedFilter = watchedFilter,
+                                    selectedTimeFilter = watchedTimeFilter,
+                                    selectedRatingFilter = watchedRatingFilter,
+                                    selectedGenre = watchedGenreFilter,
+                                    availableGenres = watchedAvailableGenres,
                                     selectedSort = watchedSort,
+                                    onSearchQueryChange = vaultViewModel::updateWatchedSearchQuery,
                                     onFilterChange = vaultViewModel::updateWatchedFilter,
+                                    onTimeFilterChange = vaultViewModel::updateWatchedTimeFilter,
+                                    onRatingFilterChange = vaultViewModel::updateWatchedRatingFilter,
+                                    onGenreChange = vaultViewModel::updateWatchedGenreFilter,
                                     onSortChange = vaultViewModel::updateWatchedSort,
+                                    onResetFilters = vaultViewModel::resetWatchedFilters,
                                     onEntryClick = { id -> navController.navigate("detail/$id") },
-                                    onBrowseClick = { selectedTab = VaultTab.BROWSE }
-                                )
-
-                                VaultTab.REVIEWS -> ReviewsScreen(
-                                    reviewedEntries = reviewedEntries,
-                                    stats = vaultStats,
-                                    selectedFilter = reviewsFilter,
-                                    onFilterChange = vaultViewModel::updateReviewsFilter,
-                                    onEntryClick = { id -> navController.navigate("detail/$id") },
-                                    onBrowseClick = { selectedTab = VaultTab.BROWSE }
+                                    onBrowseClick = { selectedTab = VaultTab.HOME }
                                 )
                             }
                         }
                     }
                 }
+            }
+        }
+
+        composable(ROUTE_REVIEWS) {
+            Scaffold(
+                containerColor = CinemaObsidian,
+                topBar = {
+                    TopAppBar(
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = CinemaObsidian,
+                            titleContentColor = CinemaAlabaster
+                        ),
+                        navigationIcon = {
+                            IconButton(onClick = { navController.popBackStack() }) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                                    contentDescription = "Back",
+                                    tint = CinemaAlabaster
+                                )
+                            }
+                        },
+                        title = {
+                            Text(
+                                text = "Reviews Journal",
+                                style = MaterialTheme.typography.headlineSmall,
+                                color = CinemaAlabaster
+                            )
+                        }
+                    )
+                }
+            ) { innerPadding ->
+                ReviewsScreen(
+                    reviewedEntries = reviewedEntries,
+                    stats = vaultStats,
+                    selectedFilter = reviewsFilter,
+                    onFilterChange = vaultViewModel::updateReviewsFilter,
+                    onEntryClick = { id -> navController.navigate("detail/$id") },
+                    onBrowseClick = {
+                        navController.popBackStack()
+                        selectedTab = VaultTab.HOME
+                    },
+                    modifier = Modifier.padding(innerPadding)
+                )
             }
         }
 
@@ -492,14 +597,15 @@ fun CineVaultApp() {
                     vaultViewModel.loadSeasonDetails(seriesId, seasonNum)
                 },
                 onSetStatus = { status ->
-                    if (vaultEntry != null) {
-                        if (status == WatchStatus.WATCHED) {
-                            vaultViewModel.moveToWatched(vaultEntry)
-                        } else {
-                            vaultViewModel.moveToWatchlist(vaultEntry)
-                        }
+                    if (status == WatchStatus.WATCHED) {
+                        pendingMarkSeen = PendingMarkSeen(
+                            catalogTitle = catalogTitle,
+                            existingEntry = vaultEntry
+                        )
+                    } else if (vaultEntry != null) {
+                        vaultViewModel.moveToWatchlist(vaultEntry)
                     } else if (catalogTitle != null) {
-                        vaultViewModel.addOrMoveCatalogTitle(catalogTitle, status)
+                        vaultViewModel.addOrMoveCatalogTitle(catalogTitle, WatchStatus.WANT_TO_WATCH)
                     }
                 },
                 onTogglePriority = {
@@ -511,7 +617,7 @@ fun CineVaultApp() {
                 onUpdateRewatch = { nextRewatch ->
                     if (vaultEntry != null) vaultViewModel.updateRewatchCount(vaultEntry, nextRewatch)
                 },
-                onSaveReview = { status, rating, rTitle, rBody, quote, spoilers ->
+                onSaveReview = { status, rating, rTitle, rBody, quote, spoilers, watchedAtMillis ->
                     vaultViewModel.saveReviewAndRating(
                         catalogTitle = catalogTitle,
                         existingEntry = vaultEntry,
@@ -521,7 +627,8 @@ fun CineVaultApp() {
                         reviewTitle = rTitle,
                         reviewBody = rBody,
                         favoriteQuote = quote,
-                        containsSpoilers = spoilers
+                        containsSpoilers = spoilers,
+                        watchedAt = watchedAtMillis
                     )
                 },
                 onDeleteEntry = {
@@ -567,6 +674,46 @@ fun CineVaultApp() {
                 onTitleClick = { id -> navController.navigate("detail/$id") }
             )
         }
+    }
+
+    val activeMarkSeen = pendingMarkSeen
+    if (activeMarkSeen != null) {
+        val displayTitle = activeMarkSeen.existingEntry?.title
+            ?: activeMarkSeen.catalogTitle?.title
+            ?: "Untitled"
+        val displayYear = activeMarkSeen.existingEntry?.releaseYear?.toInt()
+            ?: activeMarkSeen.catalogTitle?.releaseYear
+            ?: 2024
+        val displayMediaType = activeMarkSeen.existingEntry?.mediaTypeEnum
+            ?: activeMarkSeen.catalogTitle?.mediaType
+            ?: MediaType.MOVIE
+        val initialRating = activeMarkSeen.existingEntry?.userRating
+            ?.takeIf { it > 0.0 }
+            ?.roundToInt()
+            ?: 0
+        val initialHeadline = activeMarkSeen.existingEntry?.reviewTitle.orEmpty()
+        val initialWatchedAt = activeMarkSeen.existingEntry?.watchedAt ?: 0L
+
+        MarkSeenDialog(
+            title = displayTitle,
+            releaseYear = displayYear,
+            mediaType = displayMediaType,
+            initialRating = initialRating,
+            initialHeadline = initialHeadline,
+            initialWatchedAt = initialWatchedAt,
+            isSaving = isMutating,
+            onDismiss = { pendingMarkSeen = null },
+            onConfirm = { rating, reviewHeadline, watchedAtMillis ->
+                vaultViewModel.markSeenWithDetails(
+                    catalogTitle = activeMarkSeen.catalogTitle,
+                    existingEntry = activeMarkSeen.existingEntry,
+                    rating = rating,
+                    reviewTitle = reviewHeadline,
+                    watchedAtMillis = watchedAtMillis,
+                    onComplete = { pendingMarkSeen = null }
+                )
+            }
+        )
     }
 
     if (showSeasonSheet) {

@@ -405,6 +405,128 @@ object CatalogRepository {
                 CastMember("Andreas Pietschmann", "The Stranger")
             ),
             awardsHighlight = "Grimme-Preis Winner"
+        ),
+        CatalogTitle(
+            id = "3_idiots",
+            title = "3 Idiots",
+            tagline = "All is well.",
+            mediaType = MediaType.MOVIE,
+            releaseYear = 2009,
+            genres = listOf("Comedy", "Drama"),
+            directorOrCreator = "Rajkumar Hirani",
+            studioOrNetwork = "Vinod Chopra Films",
+            country = "India",
+            language = "Hindi",
+            ageRating = "PG-13",
+            runtimeOrSeasons = "2h 50m",
+            totalEpisodes = 0,
+            criticScore = 8.4,
+            synopsis = "Two friends embark on a quest for a lost buddy who once inspired them to think differently, even as the rest of the world called them idiots.",
+            posterKey = "drama",
+            cast = listOf(
+                CastMember("Aamir Khan", "Rancho"),
+                CastMember("R. Madhavan", "Farhan Qureshi"),
+                CastMember("Sharman Joshi", "Raju Rastogi"),
+                CastMember("Kareena Kapoor", "Pia")
+            ),
+            awardsHighlight = "6 Filmfare Awards including Best Film"
+        ),
+        CatalogTitle(
+            id = "gangs_of_wasseypur",
+            title = "Gangs of Wasseypur",
+            tagline = "A clash of coal, blood, and vengeance.",
+            mediaType = MediaType.MOVIE,
+            releaseYear = 2012,
+            genres = listOf("Crime", "Action", "Drama"),
+            directorOrCreator = "Anurag Kashyap",
+            studioOrNetwork = "Viacom18 Motion Pictures",
+            country = "India",
+            language = "Hindi",
+            ageRating = "R",
+            runtimeOrSeasons = "2h 40m",
+            totalEpisodes = 0,
+            criticScore = 8.2,
+            synopsis = "A clash between Sultan and Shahid Khan leads to the expulsion of Khan from Wasseypur, igniting a deadly blood feud spanning three generations.",
+            posterKey = "noir",
+            cast = listOf(
+                CastMember("Manoj Bajpayee", "Sardar Khan"),
+                CastMember("Nawazuddin Siddiqui", "Faizal Khan"),
+                CastMember("Richa Chadha", "Nagma Khatoon")
+            ),
+            awardsHighlight = "Cannes Directors' Fortnight Selection"
+        ),
+        CatalogTitle(
+            id = "zindagi_na_milegi_dobara",
+            title = "Zindagi Na Milegi Dobara",
+            tagline = "Live life one road trip at a time.",
+            mediaType = MediaType.MOVIE,
+            releaseYear = 2011,
+            genres = listOf("Drama", "Comedy", "Romance"),
+            directorOrCreator = "Zoya Akhtar",
+            studioOrNetwork = "Excel Entertainment",
+            country = "India",
+            language = "Hindi",
+            ageRating = "PG-13",
+            runtimeOrSeasons = "2h 35m",
+            totalEpisodes = 0,
+            criticScore = 8.2,
+            synopsis = "Three childhood friends reunite for a bachelor road trip across Spain, where confronting their deepest fears transforms their bond forever.",
+            posterKey = "cinema",
+            cast = listOf(
+                CastMember("Hrithik Roshan", "Arjun Saluja"),
+                CastMember("Farhan Akhtar", "Imraan Qureshi"),
+                CastMember("Abhay Deol", "Kabir Dewan"),
+                CastMember("Katrina Kaif", "Laila")
+            ),
+            awardsHighlight = "7 Filmfare Awards including Best Film"
+        ),
+        CatalogTitle(
+            id = "the_godfather",
+            title = "The Godfather",
+            tagline = "An offer you can't refuse.",
+            mediaType = MediaType.MOVIE,
+            releaseYear = 1972,
+            genres = listOf("Crime", "Drama"),
+            directorOrCreator = "Francis Ford Coppola",
+            studioOrNetwork = "Paramount Pictures",
+            country = "United States",
+            language = "English",
+            ageRating = "R",
+            runtimeOrSeasons = "2h 55m",
+            totalEpisodes = 0,
+            criticScore = 9.2,
+            synopsis = "The aging patriarch of an organized crime dynasty transfers control of his clandestine empire to his reluctant youngest son.",
+            posterKey = "noir",
+            cast = listOf(
+                CastMember("Marlon Brando", "Don Vito Corleone"),
+                CastMember("Al Pacino", "Michael Corleone"),
+                CastMember("James Caan", "Sonny Corleone")
+            ),
+            awardsHighlight = "Academy Award Winner · Best Picture"
+        ),
+        CatalogTitle(
+            id = "shawshank_redemption",
+            title = "The Shawshank Redemption",
+            tagline = "Fear can hold you prisoner. Hope can set you free.",
+            mediaType = MediaType.MOVIE,
+            releaseYear = 1994,
+            genres = listOf("Drama", "Crime"),
+            directorOrCreator = "Frank Darabont",
+            studioOrNetwork = "Castle Rock Entertainment",
+            country = "United States",
+            language = "English",
+            ageRating = "R",
+            runtimeOrSeasons = "2h 22m",
+            totalEpisodes = 0,
+            criticScore = 9.3,
+            synopsis = "Imprisoned in the 1940s for the double murder of his wife and her lover, upstanding banker Andy Dufresne begins a new life at Shawshank prison.",
+            posterKey = "drama",
+            cast = listOf(
+                CastMember("Tim Robbins", "Andy Dufresne"),
+                CastMember("Morgan Freeman", "Ellis Boyd 'Red' Redding"),
+                CastMember("Bob Gunton", "Warden Norton")
+            ),
+            awardsHighlight = "7 Academy Award Nominations"
         )
     )
 
@@ -427,4 +549,19 @@ object CatalogRepository {
     fun featuredTitle(): CatalogTitle = curatedTitles.first()
 
     fun findById(id: String): CatalogTitle? = curatedTitles.firstOrNull { it.id == id }
+
+    fun bollywoodFallback(): List<CatalogTitle> =
+        curatedTitles.filter { it.country.contains("India", ignoreCase = true) || it.language.contains("Hindi", ignoreCase = true) }
+
+    fun hollywoodFallback(): List<CatalogTitle> =
+        curatedTitles.filter { it.mediaType == MediaType.MOVIE && it.country.contains("United States", ignoreCase = true) }
+
+    fun ottNewFallback(): List<CatalogTitle> =
+        curatedTitles.filter { it.releaseYear >= 2022 }
+
+    fun classicFallback(): List<CatalogTitle> =
+        curatedTitles.filter { it.mediaType == MediaType.MOVIE && it.releaseYear < 2000 }
+
+    fun famousFallback(): List<CatalogTitle> =
+        curatedTitles.filter { it.mediaType == MediaType.MOVIE }.sortedByDescending { it.criticScore }
 }
