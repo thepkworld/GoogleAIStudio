@@ -19,16 +19,12 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Configure Google Services JSON (if secret provided)
+      - name: Configure TMDB API secret (if provided)
         env:
-          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
         run: |
-          if [ ! -f app/google-services.json ] && [ -n "$GOOGLE_SERVICES_JSON" ]; then
-            trimmed="$(printf '%s' "$GOOGLE_SERVICES_JSON" | sed 's/^[[:space:]]*//')"
-            case "$trimmed" in
-              \{*) printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json ;;
-              *) printf '%s' "$GOOGLE_SERVICES_JSON" | base64 -d > app/google-services.json ;;
-            esac
+          if [ -n "$TMDB_API_KEY" ]; then
+            printf 'TMDB_API_KEY=%s\n' "$TMDB_API_KEY" > .env
           fi
 
       - name: Configure debug keystore

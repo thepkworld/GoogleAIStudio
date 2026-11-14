@@ -212,6 +212,7 @@ private fun WatchedItemCard(
         ) {
             CinemaPosterArtwork(
                 posterKey = entry.posterKey,
+                posterUrl = entry.posterUrl,
                 title = entry.title,
                 mediaType = entry.mediaTypeEnum,
                 userRating = entry.userRating,

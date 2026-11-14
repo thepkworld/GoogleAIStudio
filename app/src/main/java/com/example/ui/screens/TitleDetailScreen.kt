@@ -1,7 +1,8 @@
 package com.example.ui.screens
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -13,10 +14,10 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
@@ -29,13 +30,17 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.CollectionsBookmark
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.EmojiEvents
 import androidx.compose.material.icons.rounded.FormatQuote
+import androidx.compose.material.icons.rounded.LiveTv
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.RateReview
 import androidx.compose.material.icons.rounded.Remove
@@ -72,19 +77,21 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.data.model.CatalogTitle
 import com.example.data.model.MediaType
 import com.example.data.model.VaultEntry
 import com.example.data.model.WatchStatus
+import com.example.ui.components.CinemaBackdropImage
 import com.example.ui.components.CinemaPosterArtwork
 import com.example.ui.components.RatingPill
-import com.example.ui.components.posterDrawableForKey
 import com.example.ui.theme.CinemaAlabaster
 import com.example.ui.theme.CinemaBorderSubtle
 import com.example.ui.theme.CinemaCrimson
@@ -94,6 +101,7 @@ import com.example.ui.theme.CinemaObsidian
 import com.example.ui.theme.CinemaSilver
 import com.example.ui.theme.CinemaSlate
 import com.example.ui.theme.CinemaSlateElevated
+import java.text.NumberFormat
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -103,8 +111,13 @@ fun TitleDetailScreen(
     titleId: String,
     catalogTitle: CatalogTitle?,
     vaultEntry: VaultEntry?,
+    isLoadingDetail: Boolean,
     isMutating: Boolean,
     onBack: () -> Unit,
+    onRecommendationClick: (String) -> Unit,
+    onPersonClick: (Int) -> Unit,
+    onCollectionClick: (Int) -> Unit,
+    onSeasonClick: (seriesId: Int, seasonNumber: Int) -> Unit,
     onSetStatus: (WatchStatus) -> Unit,
     onTogglePriority: () -> Unit,
     onUpdateEpisodes: (Long) -> Unit,
@@ -119,23 +132,28 @@ fun TitleDetailScreen(
     ) -> Unit,
     onDeleteEntry: () -> Unit
 ) {
-    val displayTitle = vaultEntry?.title ?: catalogTitle?.title ?: "Untitled"
-    val displayYear = vaultEntry?.releaseYear?.toInt() ?: catalogTitle?.releaseYear ?: 2024
-    val displayMediaType = vaultEntry?.mediaTypeEnum ?: catalogTitle?.mediaType ?: MediaType.MOVIE
-    val displayDirector = vaultEntry?.directorOrCreator?.ifBlank { catalogTitle?.directorOrCreator }
-        ?: catalogTitle?.directorOrCreator ?: "Unknown"
-    val displayRuntime = vaultEntry?.runtimeOrSeasons?.ifBlank { catalogTitle?.runtimeOrSeasons }
-        ?: catalogTitle?.runtimeOrSeasons ?: ""
-    val displaySynopsis = vaultEntry?.synopsis?.ifBlank { catalogTitle?.synopsis }
-        ?: catalogTitle?.synopsis ?: ""
-    val displayGenres = vaultEntry?.genres?.ifEmpty { catalogTitle?.genres.orEmpty() }
-        ?: catalogTitle?.genres.orEmpty()
+    val context = LocalContext.current
+    val displayTitle = catalogTitle?.title?.ifBlank { vaultEntry?.title } ?: vaultEntry?.title ?: "Untitled"
+    val displayYear = catalogTitle?.releaseYear ?: vaultEntry?.releaseYear?.toInt() ?: 2024
+    val displayMediaType = catalogTitle?.mediaType ?: vaultEntry?.mediaTypeEnum ?: MediaType.MOVIE
+    val displayDirector = catalogTitle?.directorOrCreator?.ifBlank { vaultEntry?.directorOrCreator }
+        ?: vaultEntry?.directorOrCreator ?: "Unknown"
+    val displayRuntime = catalogTitle?.runtimeOrSeasons?.ifBlank { vaultEntry?.runtimeOrSeasons }
+        ?: vaultEntry?.runtimeOrSeasons ?: ""
+    val displaySynopsis = catalogTitle?.synopsis?.ifBlank { vaultEntry?.synopsis }
+        ?: vaultEntry?.synopsis ?: ""
+    val displayGenres = catalogTitle?.genres?.ifEmpty { vaultEntry?.genres.orEmpty() }
+        ?: vaultEntry?.genres.orEmpty()
     val displayPosterKey = vaultEntry?.posterKey ?: catalogTitle?.posterKey ?: "cinema"
-    val totalEpisodes = vaultEntry?.totalEpisodes?.toInt() ?: catalogTitle?.totalEpisodes ?: 0
+    val displayPosterUrl = catalogTitle?.posterUrl?.ifBlank { vaultEntry?.posterUrl }
+        ?: vaultEntry?.posterUrl.orEmpty()
+    val displayBackdropUrl = catalogTitle?.backdropUrl?.ifBlank { vaultEntry?.backdropUrl }
+        ?: vaultEntry?.backdropUrl.orEmpty()
+    val totalEpisodes = catalogTitle?.totalEpisodes?.takeIf { it > 0 }
+        ?: vaultEntry?.totalEpisodes?.toInt() ?: 0
 
     var showDeleteDialog by remember { mutableStateOf(false) }
 
-    // Editable review & rating state synced to current vault entry
     var draftRating by remember(vaultEntry?.id, vaultEntry?.userRating) {
         mutableDoubleStateOf(vaultEntry?.userRating ?: 0.0)
     }
@@ -161,13 +179,12 @@ fun TitleDetailScreen(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = 48.dp)
         ) {
-            // Full-bleed backdrop + overlapping poster
             item(key = "detail_hero") {
                 Box(modifier = Modifier.fillMaxWidth()) {
-                    Image(
-                        painter = painterResource(id = posterDrawableForKey(displayPosterKey)),
+                    CinemaBackdropImage(
+                        imageUrl = displayBackdropUrl.ifBlank { displayPosterUrl },
+                        fallbackKey = displayPosterKey,
                         contentDescription = null,
-                        contentScale = ContentScale.Crop,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(275.dp)
@@ -178,14 +195,13 @@ fun TitleDetailScreen(
                             .height(275.dp)
                             .background(
                                 Brush.verticalGradient(
-                                    0.0f to CinemaObsidian.copy(alpha = 0.45f),
+                                    0.0f to CinemaObsidian.copy(alpha = 0.42f),
                                     0.55f to CinemaObsidian.copy(alpha = 0.72f),
                                     1.0f to CinemaObsidian
                                 )
                             )
                     )
 
-                    // Top Navigation Bar over backdrop
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -231,7 +247,6 @@ fun TitleDetailScreen(
                         }
                     }
 
-                    // Poster + Title Lockup
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -240,13 +255,14 @@ fun TitleDetailScreen(
                     ) {
                         CinemaPosterArtwork(
                             posterKey = displayPosterKey,
+                            posterUrl = displayPosterUrl,
                             title = displayTitle,
                             mediaType = displayMediaType,
                             userRating = vaultEntry?.userRating ?: 0.0,
                             status = vaultEntry?.statusEnum,
                             modifier = Modifier
                                 .width(114.dp)
-                                .height(164.dp)
+                                .height(166.dp)
                         )
 
                         Spacer(modifier = Modifier.width(16.dp))
@@ -276,8 +292,8 @@ fun TitleDetailScreen(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                if (catalogTitle != null) {
-                                    RatingPill(score = catalogTitle.criticScore, labelPrefix = "CRITIC")
+                                if (catalogTitle != null && catalogTitle.criticScore > 0.0) {
+                                    RatingPill(score = catalogTitle.criticScore, labelPrefix = "TMDB")
                                 }
                                 Text(
                                     text = "$displayYear",
@@ -300,6 +316,18 @@ fun TitleDetailScreen(
                             }
                         }
                     }
+                }
+            }
+
+            if (isLoadingDetail) {
+                item(key = "detail_loading_bar") {
+                    LinearProgressIndicator(
+                        color = CinemaGold,
+                        trackColor = CinemaSlateElevated,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 6.dp)
+                    )
                 }
             }
 
@@ -333,11 +361,7 @@ fun TitleDetailScreen(
                                 .height(50.dp)
                                 .testTag("detail_want_to_watch_button")
                         ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Bookmark,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
+                            Icon(Icons.Rounded.Bookmark, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = if (isWatchlist) "In Watchlist" else "Want to Watch",
@@ -364,11 +388,7 @@ fun TitleDetailScreen(
                                 .height(50.dp)
                                 .testTag("detail_watched_button")
                         ) {
-                            Icon(
-                                imageVector = Icons.Rounded.CheckCircle,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
+                            Icon(Icons.Rounded.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = if (isWatched) "Watched" else "Mark Watched",
@@ -379,7 +399,6 @@ fun TitleDetailScreen(
                         }
                     }
 
-                    // Priority / Series Episode Tracker / Rewatch Controls
                     if (vaultEntry != null) {
                         Surface(
                             color = CinemaSlate,
@@ -398,33 +417,17 @@ fun TitleDetailScreen(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(
-                                                imageVector = Icons.Rounded.PushPin,
-                                                contentDescription = null,
-                                                tint = CinemaGold,
-                                                modifier = Modifier.size(18.dp)
-                                            )
+                                            Icon(Icons.Rounded.PushPin, contentDescription = null, tint = CinemaGold, modifier = Modifier.size(18.dp))
                                             Spacer(modifier = Modifier.width(8.dp))
                                             Column {
-                                                Text(
-                                                    text = "Pin as Up Next",
-                                                    style = MaterialTheme.typography.titleSmall,
-                                                    color = CinemaAlabaster
-                                                )
-                                                Text(
-                                                    text = "Prioritize at the top of your watchlist",
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = CinemaSilver
-                                                )
+                                                Text("Pin as Up Next", style = MaterialTheme.typography.titleSmall, color = CinemaAlabaster)
+                                                Text("Prioritize at the top of your watchlist", style = MaterialTheme.typography.bodySmall, color = CinemaSilver)
                                             }
                                         }
                                         Switch(
                                             checked = vaultEntry.priority,
                                             onCheckedChange = { onTogglePriority() },
-                                            colors = SwitchDefaults.colors(
-                                                checkedThumbColor = CinemaObsidian,
-                                                checkedTrackColor = CinemaGold
-                                            )
+                                            colors = SwitchDefaults.colors(checkedThumbColor = CinemaObsidian, checkedTrackColor = CinemaGold)
                                         )
                                     }
                                 }
@@ -438,16 +441,8 @@ fun TitleDetailScreen(
                                             horizontalArrangement = Arrangement.SpaceBetween,
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Text(
-                                                text = "Episode Progress",
-                                                style = MaterialTheme.typography.titleSmall,
-                                                color = CinemaAlabaster
-                                            )
-                                            Text(
-                                                text = "$watchedEp / $totalEpisodes EP",
-                                                style = MaterialTheme.typography.labelMedium,
-                                                color = CinemaGold
-                                            )
+                                            Text("Episode Progress", style = MaterialTheme.typography.titleSmall, color = CinemaAlabaster)
+                                            Text("$watchedEp / $totalEpisodes EP", style = MaterialTheme.typography.labelMedium, color = CinemaGold)
                                         }
                                         LinearProgressIndicator(
                                             progress = { progress },
@@ -473,10 +468,7 @@ fun TitleDetailScreen(
                                                 onClick = { onUpdateEpisodes((watchedEp + 1).coerceAtMost(totalEpisodes.toLong())) },
                                                 enabled = watchedEp < totalEpisodes,
                                                 shape = RoundedCornerShape(10.dp),
-                                                colors = ButtonDefaults.buttonColors(
-                                                    containerColor = CinemaGold,
-                                                    contentColor = CinemaObsidian
-                                                ),
+                                                colors = ButtonDefaults.buttonColors(containerColor = CinemaGold, contentColor = CinemaObsidian),
                                                 modifier = Modifier.weight(1f)
                                             ) {
                                                 Icon(Icons.Rounded.Add, contentDescription = "Increase episodes", modifier = Modifier.size(16.dp))
@@ -494,24 +486,11 @@ fun TitleDetailScreen(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(
-                                                imageVector = Icons.Rounded.Repeat,
-                                                contentDescription = null,
-                                                tint = CinemaEmerald,
-                                                modifier = Modifier.size(18.dp)
-                                            )
+                                            Icon(Icons.Rounded.Repeat, contentDescription = null, tint = CinemaEmerald, modifier = Modifier.size(18.dp))
                                             Spacer(modifier = Modifier.width(8.dp))
                                             Column {
-                                                Text(
-                                                    text = "Rewatches",
-                                                    style = MaterialTheme.typography.titleSmall,
-                                                    color = CinemaAlabaster
-                                                )
-                                                Text(
-                                                    text = "Logged ${vaultEntry.rewatchCount} rewatch(es)",
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = CinemaSilver
-                                                )
+                                                Text("Rewatches", style = MaterialTheme.typography.titleSmall, color = CinemaAlabaster)
+                                                Text("Logged ${vaultEntry.rewatchCount} rewatch(es)", style = MaterialTheme.typography.bodySmall, color = CinemaSilver)
                                             }
                                         }
                                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -521,14 +500,8 @@ fun TitleDetailScreen(
                                             ) {
                                                 Icon(Icons.Rounded.Remove, contentDescription = "Decrease rewatch", tint = CinemaSilver)
                                             }
-                                            Text(
-                                                text = "${vaultEntry.rewatchCount}",
-                                                style = MaterialTheme.typography.titleMedium,
-                                                color = CinemaEmerald
-                                            )
-                                            IconButton(
-                                                onClick = { onUpdateRewatch(vaultEntry.rewatchCount + 1) }
-                                            ) {
+                                            Text("${vaultEntry.rewatchCount}", style = MaterialTheme.typography.titleMedium, color = CinemaEmerald)
+                                            IconButton(onClick = { onUpdateRewatch(vaultEntry.rewatchCount + 1) }) {
                                                 Icon(Icons.Rounded.Add, contentDescription = "Log rewatch", tint = CinemaEmerald)
                                             }
                                         }
@@ -540,11 +513,11 @@ fun TitleDetailScreen(
                 }
             }
 
-            // Full Details, Info, Genres & Synopsis
+            // Full TMDB Details
             item(key = "detail_info") {
                 Column(
                     modifier = Modifier.padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(18.dp)
                 ) {
                     if (displayGenres.isNotEmpty()) {
                         FlowRow(
@@ -568,23 +541,140 @@ fun TitleDetailScreen(
                         }
                     }
 
-                    // Synopsis
                     if (displaySynopsis.isNotBlank()) {
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text(
-                                text = "Synopsis",
-                                style = MaterialTheme.typography.headlineSmall,
-                                color = CinemaAlabaster
-                            )
-                            Text(
-                                text = displaySynopsis,
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = CinemaSilver
-                            )
+                            Text("Synopsis", style = MaterialTheme.typography.headlineSmall, color = CinemaAlabaster)
+                            Text(displaySynopsis, style = MaterialTheme.typography.bodyLarge, color = CinemaSilver)
                         }
                     }
 
-                    // Awards Highlight
+                    // Where to Watch Providers
+                    if (catalogTitle != null && catalogTitle.watchProviders.isNotEmpty()) {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Rounded.LiveTv, contentDescription = null, tint = CinemaGold, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Where to Watch", style = MaterialTheme.typography.headlineSmall, color = CinemaAlabaster)
+                            }
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                items(catalogTitle.watchProviders, key = { "${it.id}_${it.tier}" }) { provider ->
+                                    Surface(
+                                        color = CinemaSlate,
+                                        shape = RoundedCornerShape(12.dp),
+                                        border = BorderStroke(1.dp, CinemaBorderSubtle)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            if (provider.logoUrl.isNotBlank()) {
+                                                AsyncImage(
+                                                    model = ImageRequest.Builder(LocalContext.current)
+                                                        .data(provider.logoUrl)
+                                                        .crossfade(true)
+                                                        .build(),
+                                                    contentDescription = provider.name,
+                                                    modifier = Modifier
+                                                        .size(28.dp)
+                                                        .clip(RoundedCornerShape(7.dp))
+                                                )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                            }
+                                            Column {
+                                                Text(provider.name, style = MaterialTheme.typography.labelLarge, color = CinemaAlabaster)
+                                                Text(provider.tier, style = MaterialTheme.typography.labelSmall, color = CinemaEmerald)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Franchise Collection Banner
+                    val collection = catalogTitle?.collection
+                    if (collection != null) {
+                        Surface(
+                            color = CinemaSlate,
+                            shape = RoundedCornerShape(16.dp),
+                            border = BorderStroke(1.dp, CinemaGold.copy(alpha = 0.45f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .clickable { onCollectionClick(collection.id) }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.CollectionsBookmark,
+                                    contentDescription = null,
+                                    tint = CinemaGold,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("PART OF COLLECTION", style = MaterialTheme.typography.labelSmall, color = CinemaGold)
+                                    Text(collection.name, style = MaterialTheme.typography.titleMedium, color = CinemaAlabaster)
+                                }
+                                Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = "Open collection", tint = CinemaGold)
+                            }
+                        }
+                    }
+
+                    // Seasons Explorer (TV Series)
+                    val tmdbSeriesId = catalogTitle?.tmdbId
+                    if (displayMediaType == MediaType.SERIES &&
+                        tmdbSeriesId != null &&
+                        catalogTitle.seasons.isNotEmpty()
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text("Seasons & Episodes", style = MaterialTheme.typography.headlineSmall, color = CinemaAlabaster)
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                items(catalogTitle.seasons, key = { "season_${it.seasonNumber}" }) { season ->
+                                    Surface(
+                                        color = CinemaSlate,
+                                        shape = RoundedCornerShape(14.dp),
+                                        border = BorderStroke(1.dp, CinemaBorderSubtle),
+                                        modifier = Modifier
+                                            .width(154.dp)
+                                            .clip(RoundedCornerShape(14.dp))
+                                            .clickable { onSeasonClick(tmdbSeriesId, season.seasonNumber) }
+                                    ) {
+                                        Column(
+                                            modifier = Modifier.padding(10.dp),
+                                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            CinemaPosterArtwork(
+                                                posterKey = displayPosterKey,
+                                                posterUrl = season.posterUrl.ifBlank { displayPosterUrl },
+                                                title = season.name,
+                                                mediaType = MediaType.SERIES,
+                                                showBottomBadge = false,
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height(110.dp)
+                                            )
+                                            Text(
+                                                text = season.name,
+                                                style = MaterialTheme.typography.titleSmall,
+                                                color = CinemaAlabaster,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Text(
+                                                text = "${season.episodeCount} Episodes",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = CinemaGold
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     if (catalogTitle?.awardsHighlight?.isNotBlank() == true) {
                         Surface(
                             color = CinemaGold.copy(alpha = 0.12f),
@@ -592,27 +682,15 @@ fun TitleDetailScreen(
                             border = BorderStroke(1.dp, CinemaGold.copy(alpha = 0.35f)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Row(
-                                modifier = Modifier.padding(14.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.EmojiEvents,
-                                    contentDescription = null,
-                                    tint = CinemaGold,
-                                    modifier = Modifier.size(22.dp)
-                                )
+                            Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Rounded.EmojiEvents, contentDescription = null, tint = CinemaGold, modifier = Modifier.size(22.dp))
                                 Spacer(modifier = Modifier.width(12.dp))
-                                Text(
-                                    text = catalogTitle.awardsHighlight,
-                                    style = MaterialTheme.typography.titleSmall,
-                                    color = CinemaGold
-                                )
+                                Text(catalogTitle.awardsHighlight, style = MaterialTheme.typography.titleSmall, color = CinemaGold)
                             }
                         }
                     }
 
-                    // Production & Technical Facts Card
+                    // Production Details
                     Surface(
                         color = CinemaSlate,
                         shape = RoundedCornerShape(18.dp),
@@ -623,11 +701,7 @@ fun TitleDetailScreen(
                             modifier = Modifier.padding(16.dp),
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Text(
-                                text = "Production Details",
-                                style = MaterialTheme.typography.headlineSmall,
-                                color = CinemaAlabaster
-                            )
+                            Text("Production Details", style = MaterialTheme.typography.headlineSmall, color = CinemaAlabaster)
                             DetailFactRow(
                                 label = if (displayMediaType == MediaType.SERIES) "Creator / Showrunner" else "Director",
                                 value = displayDirector
@@ -639,68 +713,222 @@ fun TitleDetailScreen(
                                 )
                             }
                             if (catalogTitle != null) {
-                                DetailFactRow("Studio / Network", catalogTitle.studioOrNetwork)
-                                DetailFactRow("Country", catalogTitle.country)
-                                DetailFactRow("Language", catalogTitle.language)
+                                if (catalogTitle.releaseDate.isNotBlank()) DetailFactRow("Release Date", catalogTitle.releaseDate)
+                                if (catalogTitle.studioOrNetwork.isNotBlank()) DetailFactRow("Studio / Network", catalogTitle.studioOrNetwork)
+                                if (catalogTitle.country.isNotBlank()) DetailFactRow("Country", catalogTitle.country)
+                                if (catalogTitle.language.isNotBlank()) DetailFactRow("Language", catalogTitle.language)
+                                if (catalogTitle.voteCount > 0) DetailFactRow("TMDB Votes", "${catalogTitle.voteCount} ratings")
+                                if (catalogTitle.budget > 0) DetailFactRow("Budget", "$${NumberFormat.getInstance(Locale.US).format(catalogTitle.budget)}")
+                                if (catalogTitle.revenue > 0) DetailFactRow("Box Office", "$${NumberFormat.getInstance(Locale.US).format(catalogTitle.revenue)}")
                             }
                         }
                     }
 
-                    // Cast Section
-                    if (catalogTitle != null && catalogTitle.cast.isNotEmpty()) {
+                    // Trailers & Videos
+                    if (catalogTitle != null && catalogTitle.videos.isNotEmpty()) {
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Text(
-                                text = "Top Billed Cast",
-                                style = MaterialTheme.typography.headlineSmall,
-                                color = CinemaAlabaster
-                            )
-                            LazyRow(
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                items(catalogTitle.cast, key = { it.actor }) { member ->
+                            Text("Trailers & Featurettes", style = MaterialTheme.typography.headlineSmall, color = CinemaAlabaster)
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                items(catalogTitle.videos, key = { it.id }) { video ->
+                                    val url = video.youtubeUrl
                                     Surface(
                                         color = CinemaSlate,
                                         shape = RoundedCornerShape(14.dp),
-                                        border = BorderStroke(1.dp, CinemaBorderSubtle),
-                                        modifier = Modifier.width(156.dp)
-                                    ) {
-                                        Column(
-                                            modifier = Modifier.padding(12.dp),
-                                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                                        ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(34.dp)
-                                                    .clip(CircleShape)
-                                                    .background(CinemaGold.copy(alpha = 0.16f)),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Rounded.Person,
-                                                    contentDescription = null,
-                                                    tint = CinemaGold,
-                                                    modifier = Modifier.size(18.dp)
-                                                )
+                                        border = BorderStroke(1.dp, CinemaGold.copy(alpha = 0.35f)),
+                                        modifier = Modifier
+                                            .width(210.dp)
+                                            .clip(RoundedCornerShape(14.dp))
+                                            .clickable(enabled = url != null) {
+                                                url?.let {
+                                                    runCatching {
+                                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(it)))
+                                                    }
+                                                }
                                             }
-                                            Text(
-                                                text = member.actor,
-                                                style = MaterialTheme.typography.titleSmall,
-                                                color = CinemaAlabaster,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                            Text(
-                                                text = member.role,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = CinemaSilver,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
+                                    ) {
+                                        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(Icons.Rounded.PlayCircle, contentDescription = "Play ${video.name}", tint = CinemaGold, modifier = Modifier.size(30.dp))
+                                            Spacer(modifier = Modifier.width(10.dp))
+                                            Column {
+                                                Text(video.name, style = MaterialTheme.typography.titleSmall, color = CinemaAlabaster, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                Text("${video.type} · ${video.site}", style = MaterialTheme.typography.labelSmall, color = CinemaSilver)
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
+                    }
+
+                    // Cast Section (Clickable to PersonDetailScreen when TMDB person id > 0)
+                    if (catalogTitle != null && catalogTitle.cast.isNotEmpty()) {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text("Top Billed Cast", style = MaterialTheme.typography.headlineSmall, color = CinemaAlabaster)
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                items(catalogTitle.cast, key = { "${it.id}_${it.actor}_${it.role}" }) { member ->
+                                    Surface(
+                                        color = CinemaSlate,
+                                        shape = RoundedCornerShape(14.dp),
+                                        border = BorderStroke(1.dp, CinemaBorderSubtle),
+                                        modifier = Modifier
+                                            .width(156.dp)
+                                            .clip(RoundedCornerShape(14.dp))
+                                            .clickable(enabled = member.id > 0) { onPersonClick(member.id) }
+                                    ) {
+                                        Column(
+                                            modifier = Modifier.padding(12.dp),
+                                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            if (member.profileUrl.isNotBlank()) {
+                                                AsyncImage(
+                                                    model = ImageRequest.Builder(LocalContext.current)
+                                                        .data(member.profileUrl)
+                                                        .crossfade(true)
+                                                        .build(),
+                                                    contentDescription = member.actor,
+                                                    contentScale = ContentScale.Crop,
+                                                    modifier = Modifier
+                                                        .size(44.dp)
+                                                        .clip(CircleShape)
+                                                        .background(CinemaSlateElevated)
+                                                )
+                                            } else {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(40.dp)
+                                                        .clip(CircleShape)
+                                                        .background(CinemaGold.copy(alpha = 0.16f)),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Icon(Icons.Rounded.Person, contentDescription = null, tint = CinemaGold, modifier = Modifier.size(20.dp))
+                                                }
+                                            }
+                                            Text(member.actor, style = MaterialTheme.typography.titleSmall, color = CinemaAlabaster, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            Text(member.role, style = MaterialTheme.typography.bodySmall, color = CinemaSilver, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Backdrop Gallery
+                    if (catalogTitle != null && catalogTitle.backdrops.isNotEmpty()) {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text("Stills & Backdrops", style = MaterialTheme.typography.headlineSmall, color = CinemaAlabaster)
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                items(catalogTitle.backdrops, key = { it }) { url ->
+                                    AsyncImage(
+                                        model = ImageRequest.Builder(LocalContext.current).data(url).crossfade(true).build(),
+                                        contentDescription = "Backdrop still",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier
+                                            .width(230.dp)
+                                            .height(130.dp)
+                                            .clip(RoundedCornerShape(14.dp))
+                                            .background(CinemaSlateElevated)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Keywords
+                    if (catalogTitle != null && catalogTitle.keywords.isNotEmpty()) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("Themes & Keywords", style = MaterialTheme.typography.headlineSmall, color = CinemaAlabaster)
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                catalogTitle.keywords.forEach { kw ->
+                                    Surface(
+                                        color = CinemaSlate,
+                                        shape = RoundedCornerShape(8.dp),
+                                        border = BorderStroke(1.dp, CinemaBorderSubtle)
+                                    ) {
+                                        Text(
+                                            text = "#$kw",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = CinemaGold,
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // TMDB Community Reviews
+                    if (catalogTitle != null && catalogTitle.tmdbReviews.isNotEmpty()) {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text("TMDB Community Reviews", style = MaterialTheme.typography.headlineSmall, color = CinemaAlabaster)
+                            catalogTitle.tmdbReviews.take(4).forEach { review ->
+                                var expanded by remember(review.id) { mutableStateOf(false) }
+                                Surface(
+                                    color = CinemaSlate,
+                                    shape = RoundedCornerShape(16.dp),
+                                    border = BorderStroke(1.dp, CinemaBorderSubtle),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .clickable { expanded = !expanded }
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(14.dp),
+                                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(review.author, style = MaterialTheme.typography.titleSmall, color = CinemaAlabaster)
+                                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                if (review.rating != null && review.rating > 0.0) {
+                                                    RatingPill(score = review.rating)
+                                                }
+                                                if (review.createdAt.isNotBlank()) {
+                                                    Text(review.createdAt, style = MaterialTheme.typography.labelSmall, color = CinemaSilver)
+                                                }
+                                            }
+                                        }
+                                        Text(
+                                            text = review.content,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = CinemaSilver,
+                                            maxLines = if (expanded) 20 else 4,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = if (expanded) "Show less" else "Tap to read full review",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = CinemaGold
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Recommended Next
+                    if (catalogTitle != null && catalogTitle.recommendations.isNotEmpty()) {
+                        HorizontalTitleRow(
+                            heading = "Recommended Next",
+                            items = catalogTitle.recommendations,
+                            keyPrefix = "rec",
+                            onTitleClick = onRecommendationClick
+                        )
+                    }
+
+                    // Similar Titles
+                    if (catalogTitle != null && catalogTitle.similarTitles.isNotEmpty()) {
+                        HorizontalTitleRow(
+                            heading = "Similar Titles",
+                            items = catalogTitle.similarTitles,
+                            keyPrefix = "sim",
+                            onTitleClick = onRecommendationClick
+                        )
                     }
                 }
             }
@@ -725,40 +953,22 @@ fun TitleDetailScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Rounded.RateReview,
-                                    contentDescription = null,
-                                    tint = CinemaGold,
-                                    modifier = Modifier.size(22.dp)
-                                )
+                                Icon(Icons.Rounded.RateReview, contentDescription = null, tint = CinemaGold, modifier = Modifier.size(22.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "Your Rating & Review",
-                                    style = MaterialTheme.typography.headlineSmall,
-                                    color = CinemaAlabaster
-                                )
+                                Text("Your Rating & Review", style = MaterialTheme.typography.headlineSmall, color = CinemaAlabaster)
                             }
-
                             Text(
-                                text = if (draftRating > 0.0) {
-                                    "${String.format(Locale.US, "%.1f", draftRating)} / 10"
-                                } else {
-                                    "Unrated"
-                                },
+                                text = if (draftRating > 0.0) "${String.format(Locale.US, "%.1f", draftRating)} / 10" else "Unrated",
                                 style = MaterialTheme.typography.titleMedium,
                                 color = CinemaGold,
                                 fontWeight = FontWeight.Bold
                             )
                         }
 
-                        // Interactive 0.5-step 10-point score slider + quick star presets
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Slider(
                                 value = draftRating.toFloat(),
-                                onValueChange = { raw ->
-                                    val snapped = (raw * 2f).roundToInt() / 2.0
-                                    draftRating = snapped.coerceIn(0.0, 10.0)
-                                },
+                                onValueChange = { raw -> draftRating = ((raw * 2f).roundToInt() / 2.0).coerceIn(0.0, 10.0) },
                                 valueRange = 0f..10f,
                                 steps = 19,
                                 colors = SliderDefaults.colors(
@@ -826,14 +1036,14 @@ fun TitleDetailScreen(
                             ),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .testTag("review_headline_input")
+                                .testTag("review_title_input")
                         )
 
                         OutlinedTextField(
                             value = draftReviewBody,
                             onValueChange = { if (it.length <= 4000) draftReviewBody = it },
-                            label = { Text("Full Review & Thoughts") },
-                            placeholder = { Text("Write your thoughts on pacing, cinematography, performances, finale…") },
+                            label = { Text("Full Review & Notes") },
+                            placeholder = { Text("Write about direction, score, pacing, performances…") },
                             minLines = 4,
                             maxLines = 8,
                             shape = RoundedCornerShape(14.dp),
@@ -856,11 +1066,7 @@ fun TitleDetailScreen(
                             onValueChange = { if (it.length <= 400) draftQuote = it },
                             label = { Text("Favorite Quote or Scene (Optional)") },
                             leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Rounded.FormatQuote,
-                                    contentDescription = null,
-                                    tint = CinemaGold
-                                )
+                                Icon(Icons.Rounded.FormatQuote, contentDescription = null, tint = CinemaGold)
                             },
                             maxLines = 3,
                             shape = RoundedCornerShape(14.dp),
@@ -889,40 +1095,23 @@ fun TitleDetailScreen(
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "Mark as containing spoilers",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = CinemaAlabaster
-                                )
+                                Text("Mark as containing spoilers", style = MaterialTheme.typography.bodyMedium, color = CinemaAlabaster)
                             }
                             Switch(
                                 checked = draftSpoilers,
                                 onCheckedChange = { draftSpoilers = it },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = CinemaObsidian,
-                                    checkedTrackColor = CinemaCrimson
-                                )
+                                colors = SwitchDefaults.colors(checkedThumbColor = CinemaObsidian, checkedTrackColor = CinemaCrimson)
                             )
                         }
 
                         Button(
                             onClick = {
                                 val targetStatus = vaultEntry?.statusEnum ?: WatchStatus.WATCHED
-                                onSaveReview(
-                                    targetStatus,
-                                    draftRating,
-                                    draftReviewTitle,
-                                    draftReviewBody,
-                                    draftQuote,
-                                    draftSpoilers
-                                )
+                                onSaveReview(targetStatus, draftRating, draftReviewTitle, draftReviewBody, draftQuote, draftSpoilers)
                             },
                             enabled = !isMutating,
                             shape = RoundedCornerShape(14.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = CinemaGold,
-                                contentColor = CinemaObsidian
-                            ),
+                            colors = ButtonDefaults.buttonColors(containerColor = CinemaGold, contentColor = CinemaObsidian),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(52.dp)
@@ -968,6 +1157,52 @@ fun TitleDetailScreen(
 }
 
 @Composable
+private fun HorizontalTitleRow(
+    heading: String,
+    items: List<CatalogTitle>,
+    keyPrefix: String,
+    onTitleClick: (String) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(heading, style = MaterialTheme.typography.headlineSmall, color = CinemaAlabaster)
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            items(items, key = { "${keyPrefix}_${it.id}" }) { item ->
+                Column(
+                    modifier = Modifier
+                        .width(128.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .clickable { onTitleClick(item.id) }
+                ) {
+                    CinemaPosterArtwork(
+                        posterKey = item.posterKey,
+                        posterUrl = item.posterUrl,
+                        title = item.title,
+                        mediaType = item.mediaType,
+                        userRating = item.criticScore,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(0.70f)
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = item.title,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = CinemaAlabaster,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = "${item.releaseYear}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = CinemaSilver
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun DetailFactRow(
     label: String,
     value: String
@@ -976,17 +1211,8 @@ private fun DetailFactRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = CinemaSilver
-        )
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = CinemaSilver)
         Spacer(modifier = Modifier.width(16.dp))
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            color = CinemaAlabaster,
-            fontWeight = FontWeight.Medium
-        )
+        Text(value, style = MaterialTheme.typography.bodyMedium, color = CinemaAlabaster, fontWeight = FontWeight.Medium)
     }
 }

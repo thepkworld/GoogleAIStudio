@@ -2,6 +2,7 @@ package com.example.ui
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -21,7 +22,6 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.Logout
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Explore
@@ -31,15 +31,12 @@ import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Explore
 import androidx.compose.material.icons.rounded.MovieFilter
-import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.RateReview
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -58,24 +55,18 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.credentials.CredentialManager
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -87,32 +78,27 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.R
-import com.example.data.catalog.CatalogRepository
 import com.example.data.model.WatchStatus
 import com.example.data.repository.VaultRepository
-import com.example.ui.auth.AuthScreen
-import com.example.ui.auth.authStateFlow
-import com.example.ui.auth.signOut
+import com.example.data.tmdb.TmdbRepository
 import com.example.ui.screens.AddCustomTitleSheet
 import com.example.ui.screens.BrowseScreen
+import com.example.ui.screens.CollectionDetailScreen
+import com.example.ui.screens.PersonDetailScreen
 import com.example.ui.screens.ReviewsScreen
+import com.example.ui.screens.SeasonEpisodesSheet
 import com.example.ui.screens.TitleDetailScreen
 import com.example.ui.screens.WatchedScreen
 import com.example.ui.screens.WatchlistScreen
 import com.example.ui.theme.CinemaAlabaster
 import com.example.ui.theme.CinemaBorderSubtle
-import com.example.ui.theme.CinemaCrimson
 import com.example.ui.theme.CinemaCrimsonContainer
+import com.example.ui.theme.CinemaEmerald
 import com.example.ui.theme.CinemaGold
 import com.example.ui.theme.CinemaObsidian
 import com.example.ui.theme.CinemaSilver
 import com.example.ui.theme.CinemaSlate
 import com.example.ui.theme.CinemaVelvet
-import com.google.firebase.Firebase
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.FirebaseUser
-import com.google.firebase.auth.auth
-import com.google.firebase.firestore.FirebaseFirestore
 
 private enum class VaultTab(
     val title: String,
@@ -128,40 +114,21 @@ private enum class VaultTab(
 
 private const val ROUTE_MAIN = "main"
 private const val ROUTE_DETAIL = "detail/{titleId}"
-
-@Composable
-fun CineVaultApp(auth: FirebaseAuth = Firebase.auth) {
-    val currentUser by auth.authStateFlow().collectAsStateWithLifecycle(initialValue = auth.currentUser)
-    val user = currentUser
-
-    if (user == null) {
-        AuthScreen(onAuthSuccess = { /* authStateFlow reacts automatically */ })
-    } else {
-        key(user.uid) {
-            AuthenticatedCineVault(currentUser = user)
-        }
-    }
-}
+private const val ROUTE_PERSON = "person/{personId}"
+private const val ROUTE_COLLECTION = "collection/{collectionId}"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AuthenticatedCineVault(currentUser: FirebaseUser) {
-    val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
-    val credentialManager = remember(context) { CredentialManager.create(context) }
-
+fun CineVaultApp() {
     val vaultViewModel: VaultViewModel = viewModel(
-        key = currentUser.uid,
         factory = viewModelFactory {
             initializer {
                 val app = checkNotNull(this[APPLICATION_KEY]) {
                     "APPLICATION_KEY missing from CreationExtras"
                 }
-                val databaseId = app.getString(R.string.firestore_database_id)
-                val db = FirebaseFirestore.getInstance(databaseId)
                 VaultViewModel(
-                    repository = VaultRepository(db, Firebase.auth),
-                    currentUserId = currentUser.uid
+                    repository = VaultRepository(app),
+                    tmdbRepository = TmdbRepository()
                 )
             }
         }
@@ -170,15 +137,14 @@ private fun AuthenticatedCineVault(currentUser: FirebaseUser) {
     val navController = rememberNavController()
     var selectedTab by rememberSaveable { mutableStateOf(VaultTab.BROWSE) }
     var showAddCustomSheet by remember { mutableStateOf(false) }
-    var showAccountMenu by remember { mutableStateOf(false) }
+    var showSeasonSheet by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     val vaultState by vaultViewModel.vaultEntriesState.collectAsStateWithLifecycle()
     val vaultById by vaultViewModel.vaultById.collectAsStateWithLifecycle()
-    val filteredCatalog by vaultViewModel.filteredCatalog.collectAsStateWithLifecycle()
+    val browseUiState by vaultViewModel.browseUiState.collectAsStateWithLifecycle()
     val browseQuery by vaultViewModel.browseQuery.collectAsStateWithLifecycle()
     val browseMediaFilter by vaultViewModel.browseMediaFilter.collectAsStateWithLifecycle()
-    val browseGenre by vaultViewModel.browseGenre.collectAsStateWithLifecycle()
 
     val watchlistEntries by vaultViewModel.watchlistEntries.collectAsStateWithLifecycle()
     val watchlistFilter by vaultViewModel.watchlistFilter.collectAsStateWithLifecycle()
@@ -192,6 +158,15 @@ private fun AuthenticatedCineVault(currentUser: FirebaseUser) {
     val reviewsFilter by vaultViewModel.reviewsFilter.collectAsStateWithLifecycle()
     val vaultStats by vaultViewModel.vaultStats.collectAsStateWithLifecycle()
     val isMutating by vaultViewModel.isMutating.collectAsStateWithLifecycle()
+
+    val detailTitle by vaultViewModel.detailTitle.collectAsStateWithLifecycle()
+    val isLoadingDetail by vaultViewModel.isLoadingDetail.collectAsStateWithLifecycle()
+    val personDetail by vaultViewModel.personDetail.collectAsStateWithLifecycle()
+    val isLoadingPerson by vaultViewModel.isLoadingPerson.collectAsStateWithLifecycle()
+    val collectionDetail by vaultViewModel.collectionDetail.collectAsStateWithLifecycle()
+    val isLoadingCollection by vaultViewModel.isLoadingCollection.collectAsStateWithLifecycle()
+    val seasonDetail by vaultViewModel.seasonDetail.collectAsStateWithLifecycle()
+    val isLoadingSeason by vaultViewModel.isLoadingSeason.collectAsStateWithLifecycle()
 
     LaunchedEffect(vaultViewModel) {
         vaultViewModel.snackbarEvents.collect { message ->
@@ -299,72 +274,39 @@ private fun AuthenticatedCineVault(currentUser: FirebaseUser) {
                                     }
                                 },
                                 actions = {
-                                    Box {
-                                        Surface(
-                                            color = CinemaSlate,
-                                            shape = CircleShape,
-                                            border = BorderStroke(1.dp, CinemaBorderSubtle),
-                                            modifier = Modifier.padding(end = 10.dp)
+                                    val isLive = browseUiState.isLiveTmdb
+                                    Surface(
+                                        color = if (isLive) CinemaEmerald.copy(alpha = 0.14f) else CinemaSlate,
+                                        shape = CircleShape,
+                                        border = BorderStroke(
+                                            1.dp,
+                                            if (isLive) CinemaEmerald.copy(alpha = 0.45f) else CinemaBorderSubtle
+                                        ),
+                                        modifier = Modifier
+                                            .padding(end = 12.dp)
+                                            .clip(CircleShape)
+                                            .clickable { vaultViewModel.refreshTmdbFeeds() }
+                                            .testTag("tmdb_status_pill")
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                                            verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            IconButton(
-                                                onClick = { showAccountMenu = true },
-                                                modifier = Modifier.testTag("account_menu_button")
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Rounded.Person,
-                                                    contentDescription = "Account menu",
-                                                    tint = CinemaGold
-                                                )
-                                            }
-                                        }
-
-                                        DropdownMenu(
-                                            expanded = showAccountMenu,
-                                            onDismissRequest = { showAccountMenu = false },
-                                            containerColor = CinemaSlate
-                                        ) {
-                                            Column(
-                                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
-                                            ) {
-                                                Text(
-                                                    text = currentUser.displayName ?: "Cinema Member",
-                                                    style = MaterialTheme.typography.titleSmall,
-                                                    color = CinemaAlabaster,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                                if (!currentUser.email.isNullOrBlank()) {
-                                                    Text(
-                                                        text = currentUser.email ?: "",
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        color = CinemaSilver,
-                                                        maxLines = 1,
-                                                        overflow = TextOverflow.Ellipsis
-                                                    )
-                                                }
-                                            }
-                                            HorizontalDivider(color = CinemaBorderSubtle)
-                                            DropdownMenuItem(
-                                                text = {
-                                                    Text(
-                                                        text = stringResource(id = R.string.sign_out),
-                                                        color = CinemaCrimson
-                                                    )
+                                            Icon(
+                                                imageVector = if (isLive) Icons.Rounded.Public else Icons.Rounded.Refresh,
+                                                contentDescription = "Refresh TMDB feeds",
+                                                tint = if (isLive) CinemaEmerald else CinemaGold,
+                                                modifier = Modifier.size(15.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = if (isLive) {
+                                                    stringResource(id = R.string.tmdb_live)
+                                                } else {
+                                                    stringResource(id = R.string.tmdb_offline)
                                                 },
-                                                leadingIcon = {
-                                                    Icon(
-                                                        imageVector = Icons.AutoMirrored.Rounded.Logout,
-                                                        contentDescription = null,
-                                                        tint = CinemaCrimson
-                                                    )
-                                                },
-                                                onClick = {
-                                                    showAccountMenu = false
-                                                    signOut(
-                                                        credentialManager = credentialManager,
-                                                        scope = coroutineScope
-                                                    )
-                                                }
+                                                style = MaterialTheme.typography.labelMedium,
+                                                color = if (isLive) CinemaEmerald else CinemaAlabaster
                                             )
                                         }
                                     }
@@ -459,17 +401,22 @@ private fun AuthenticatedCineVault(currentUser: FirebaseUser) {
 
                             when (selectedTab) {
                                 VaultTab.BROWSE -> BrowseScreen(
-                                    featuredTitle = vaultViewModel.featuredTitle,
-                                    catalogTitles = filteredCatalog,
-                                    allGenres = vaultViewModel.allGenres,
+                                    browseState = browseUiState,
+                                    localGenres = vaultViewModel.localGenres,
                                     searchQuery = browseQuery,
                                     selectedMediaFilter = browseMediaFilter,
-                                    selectedGenre = browseGenre,
                                     vaultById = vaultById,
                                     onSearchQueryChange = vaultViewModel::updateBrowseQuery,
                                     onMediaFilterChange = vaultViewModel::updateBrowseMediaFilter,
-                                    onGenreChange = vaultViewModel::updateBrowseGenre,
+                                    onSectionSelect = vaultViewModel::selectTmdbSection,
+                                    onGenreSelect = vaultViewModel::selectGenre,
+                                    onDiscoverSortSelect = vaultViewModel::selectDiscoverSort,
+                                    onSearchScopeSelect = vaultViewModel::selectSearchScope,
+                                    onLoadMore = vaultViewModel::loadNextPage,
+                                    onRefreshTmdb = vaultViewModel::refreshTmdbFeeds,
                                     onTitleClick = { id -> navController.navigate("detail/$id") },
+                                    onPersonClick = { pid -> navController.navigate("person/$pid") },
+                                    onCollectionClick = { cid -> navController.navigate("collection/$cid") },
                                     onQuickWatchlist = { title ->
                                         vaultViewModel.addOrMoveCatalogTitle(title, WatchStatus.WANT_TO_WATCH)
                                     },
@@ -523,15 +470,27 @@ private fun AuthenticatedCineVault(currentUser: FirebaseUser) {
             arguments = listOf(navArgument("titleId") { type = NavType.StringType })
         ) { backStackEntry ->
             val titleId = backStackEntry.arguments?.getString("titleId") ?: return@composable
-            val catalogTitle = remember(titleId) { CatalogRepository.findById(titleId) }
+            LaunchedEffect(titleId) {
+                vaultViewModel.loadTitleDetails(titleId)
+            }
+            val catalogTitle = detailTitle?.takeIf { it.id == titleId }
+                ?: remember(titleId) { vaultViewModel.resolveCatalogTitle(titleId) }
             val vaultEntry = vaultById[titleId]
 
             TitleDetailScreen(
                 titleId = titleId,
                 catalogTitle = catalogTitle,
                 vaultEntry = vaultEntry,
+                isLoadingDetail = isLoadingDetail,
                 isMutating = isMutating,
                 onBack = { navController.popBackStack() },
+                onRecommendationClick = { recId -> navController.navigate("detail/$recId") },
+                onPersonClick = { pid -> navController.navigate("person/$pid") },
+                onCollectionClick = { cid -> navController.navigate("collection/$cid") },
+                onSeasonClick = { seriesId, seasonNum ->
+                    showSeasonSheet = true
+                    vaultViewModel.loadSeasonDetails(seriesId, seasonNum)
+                },
                 onSetStatus = { status ->
                     if (vaultEntry != null) {
                         if (status == WatchStatus.WATCHED) {
@@ -544,19 +503,13 @@ private fun AuthenticatedCineVault(currentUser: FirebaseUser) {
                     }
                 },
                 onTogglePriority = {
-                    if (vaultEntry != null) {
-                        vaultViewModel.togglePriority(vaultEntry)
-                    }
+                    if (vaultEntry != null) vaultViewModel.togglePriority(vaultEntry)
                 },
                 onUpdateEpisodes = { nextEp ->
-                    if (vaultEntry != null) {
-                        vaultViewModel.updateEpisodeProgress(vaultEntry, nextEp)
-                    }
+                    if (vaultEntry != null) vaultViewModel.updateEpisodeProgress(vaultEntry, nextEp)
                 },
                 onUpdateRewatch = { nextRewatch ->
-                    if (vaultEntry != null) {
-                        vaultViewModel.updateRewatchCount(vaultEntry, nextRewatch)
-                    }
+                    if (vaultEntry != null) vaultViewModel.updateRewatchCount(vaultEntry, nextRewatch)
                 },
                 onSaveReview = { status, rating, rTitle, rBody, quote, spoilers ->
                     vaultViewModel.saveReviewAndRating(
@@ -574,14 +527,57 @@ private fun AuthenticatedCineVault(currentUser: FirebaseUser) {
                 onDeleteEntry = {
                     if (vaultEntry != null) {
                         vaultViewModel.deleteEntry(vaultEntry) {
-                            if (catalogTitle == null) {
-                                navController.popBackStack()
-                            }
+                            if (catalogTitle == null) navController.popBackStack()
                         }
                     }
                 }
             )
         }
+
+        composable(
+            route = ROUTE_PERSON,
+            arguments = listOf(navArgument("personId") { type = NavType.IntType })
+        ) { backStackEntry ->
+            val personId = backStackEntry.arguments?.getInt("personId") ?: return@composable
+            LaunchedEffect(personId) {
+                vaultViewModel.loadPersonDetails(personId)
+            }
+            PersonDetailScreen(
+                personDetail = personDetail?.takeIf { it.id == personId },
+                isLoading = isLoadingPerson,
+                vaultById = vaultById,
+                onBack = { navController.popBackStack() },
+                onTitleClick = { id -> navController.navigate("detail/$id") }
+            )
+        }
+
+        composable(
+            route = ROUTE_COLLECTION,
+            arguments = listOf(navArgument("collectionId") { type = NavType.IntType })
+        ) { backStackEntry ->
+            val collectionId = backStackEntry.arguments?.getInt("collectionId") ?: return@composable
+            LaunchedEffect(collectionId) {
+                vaultViewModel.loadCollectionDetails(collectionId)
+            }
+            CollectionDetailScreen(
+                collectionDetail = collectionDetail?.takeIf { it.id == collectionId },
+                isLoading = isLoadingCollection,
+                vaultById = vaultById,
+                onBack = { navController.popBackStack() },
+                onTitleClick = { id -> navController.navigate("detail/$id") }
+            )
+        }
+    }
+
+    if (showSeasonSheet) {
+        SeasonEpisodesSheet(
+            seasonDetail = seasonDetail,
+            isLoading = isLoadingSeason,
+            onDismiss = {
+                showSeasonSheet = false
+                vaultViewModel.clearSeasonDetail()
+            }
+        )
     }
 
     if (showAddCustomSheet) {

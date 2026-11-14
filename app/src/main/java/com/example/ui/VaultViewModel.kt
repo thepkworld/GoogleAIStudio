@@ -5,13 +5,24 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.catalog.CatalogRepository
 import com.example.data.model.CatalogTitle
+import com.example.data.model.CollectionDetail
+import com.example.data.model.CollectionSummary
+import com.example.data.model.DiscoverSort
 import com.example.data.model.MediaType
+import com.example.data.model.PersonDetail
+import com.example.data.model.PersonSummary
+import com.example.data.model.SearchScope
+import com.example.data.model.SeasonDetail
+import com.example.data.model.TmdbGenre
+import com.example.data.model.TmdbSection
 import com.example.data.model.VaultEntry
 import com.example.data.model.WatchStatus
 import com.example.data.repository.VaultRepository
-import com.google.firebase.Timestamp
-import com.google.firebase.firestore.FirebaseFirestoreException
+import com.example.data.tmdb.TmdbRepository
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -22,6 +33,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 sealed interface UiState<out T> {
@@ -59,18 +71,44 @@ data class VaultStats(
     val averageRating: Double = 0.0,
     val ratedCount: Int = 0,
     val totalReviews: Int = 0,
-    val ratingBuckets: List<Int> = listOf(0, 0, 0, 0, 0), // 1-2, 3-4, 5-6, 7-8, 9-10
+    val ratingBuckets: List<Int> = listOf(0, 0, 0, 0, 0),
     val topGenres: List<Pair<String, Int>> = emptyList()
 )
 
+data class BrowseUiState(
+    val keyConfigured: Boolean = false,
+    val isLiveTmdb: Boolean = false,
+    val isLoading: Boolean = false,
+    val isLoadingMore: Boolean = false,
+    val errorMessage: String? = null,
+    val selectedSection: TmdbSection = TmdbSection.TRENDING_ALL,
+    val discoverSort: DiscoverSort = DiscoverSort.POPULARITY,
+    val searchScope: SearchScope = SearchScope.MULTI,
+    val featuredTitle: CatalogTitle = CatalogRepository.featuredTitle(),
+    val trendingTitles: List<CatalogTitle> = emptyList(),
+    val acclaimedTitles: List<CatalogTitle> = CatalogRepository.allTitles().filter { it.criticScore >= 8.8 }.take(6),
+    val trendingPeople: List<PersonSummary> = emptyList(),
+    val sectionTitles: List<CatalogTitle> = CatalogRepository.allTitles(),
+    val searchPeople: List<PersonSummary> = emptyList(),
+    val searchCollections: List<CollectionSummary> = emptyList(),
+    val movieGenres: List<TmdbGenre> = emptyList(),
+    val tvGenres: List<TmdbGenre> = emptyList(),
+    val selectedGenreId: Int? = null,
+    val selectedGenreLabel: String = "All",
+    val currentPage: Int = 1,
+    val totalPages: Int = 1
+) {
+    val canLoadMore: Boolean
+        get() = isLiveTmdb && currentPage < totalPages && !isLoading && !isLoadingMore
+}
+
 class VaultViewModel(
     private val repository: VaultRepository,
-    private val currentUserId: String
+    private val tmdbRepository: TmdbRepository = TmdbRepository()
 ) : ViewModel() {
 
-    val catalogTitles: List<CatalogTitle> = CatalogRepository.allTitles()
-    val featuredTitle: CatalogTitle = CatalogRepository.featuredTitle()
-    val allGenres: List<String> = CatalogRepository.allGenres
+    private val localCatalogTitles: List<CatalogTitle> = CatalogRepository.allTitles()
+    val localGenres: List<String> = CatalogRepository.allGenres
 
     // Browse filters
     private val _browseQuery = MutableStateFlow("")
@@ -79,8 +117,35 @@ class VaultViewModel(
     private val _browseMediaFilter = MutableStateFlow(MediaFilter.ALL)
     val browseMediaFilter: StateFlow<MediaFilter> = _browseMediaFilter.asStateFlow()
 
-    private val _browseGenre = MutableStateFlow("All")
-    val browseGenre: StateFlow<String> = _browseGenre.asStateFlow()
+    private val _browseUiState = MutableStateFlow(
+        BrowseUiState(keyConfigured = tmdbRepository.hasConfiguredApiKey())
+    )
+    val browseUiState: StateFlow<BrowseUiState> = _browseUiState.asStateFlow()
+
+    // Detail states
+    private val _detailTitle = MutableStateFlow<CatalogTitle?>(null)
+    val detailTitle: StateFlow<CatalogTitle?> = _detailTitle.asStateFlow()
+
+    private val _isLoadingDetail = MutableStateFlow(false)
+    val isLoadingDetail: StateFlow<Boolean> = _isLoadingDetail.asStateFlow()
+
+    private val _personDetail = MutableStateFlow<PersonDetail?>(null)
+    val personDetail: StateFlow<PersonDetail?> = _personDetail.asStateFlow()
+
+    private val _isLoadingPerson = MutableStateFlow(false)
+    val isLoadingPerson: StateFlow<Boolean> = _isLoadingPerson.asStateFlow()
+
+    private val _collectionDetail = MutableStateFlow<CollectionDetail?>(null)
+    val collectionDetail: StateFlow<CollectionDetail?> = _collectionDetail.asStateFlow()
+
+    private val _isLoadingCollection = MutableStateFlow(false)
+    val isLoadingCollection: StateFlow<Boolean> = _isLoadingCollection.asStateFlow()
+
+    private val _seasonDetail = MutableStateFlow<SeasonDetail?>(null)
+    val seasonDetail: StateFlow<SeasonDetail?> = _seasonDetail.asStateFlow()
+
+    private val _isLoadingSeason = MutableStateFlow(false)
+    val isLoadingSeason: StateFlow<Boolean> = _isLoadingSeason.asStateFlow()
 
     // Watchlist filters
     private val _watchlistFilter = MutableStateFlow(MediaFilter.ALL)
@@ -106,21 +171,32 @@ class VaultViewModel(
     private val _isMutating = MutableStateFlow(false)
     val isMutating: StateFlow<Boolean> = _isMutating.asStateFlow()
 
+    private var searchJob: Job? = null
+    private var sectionJob: Job? = null
+    private var detailJob: Job? = null
+    private var personJob: Job? = null
+    private var collectionJob: Job? = null
+    private var seasonJob: Job? = null
+
+    init {
+        if (tmdbRepository.hasConfiguredApiKey()) {
+            loadInitialTmdbFeeds()
+        } else {
+            refreshOfflineFilteredBrowse()
+        }
+    }
+
     val vaultEntriesState: StateFlow<UiState<List<VaultEntry>>> =
-        repository.observeVaultEntries(currentUserId)
+        repository.observeVaultEntries()
             .map<List<VaultEntry>, UiState<List<VaultEntry>>> { entries ->
                 UiState.Success(
-                    entries.sortedByDescending { it.updatedAt ?: it.createdAt ?: Timestamp(0, 0) }
+                    entries.sortedByDescending { maxOf(it.updatedAt, it.createdAt) }
                 )
             }
             .catch { error ->
-                val firestoreError = generateSequence(error) { it.cause }
-                    .filterIsInstance<FirebaseFirestoreException>()
-                    .firstOrNull()
-                if (firestoreError == null && error is CancellationException) throw error
-                val rootError = firestoreError ?: error
-                Log.w(TAG, "Error observing vault entries", rootError)
-                emit(UiState.Error(rootError.message ?: "Failed to sync your cinema vault"))
+                if (error is CancellationException) throw error
+                Log.w(TAG, "Error observing Room vault entries", error)
+                emit(UiState.Error(error.message ?: "Failed to load your local cinema vault"))
             }
             .stateIn(
                 scope = viewModelScope,
@@ -141,32 +217,6 @@ class VaultViewModel(
             initialValue = emptyMap()
         )
 
-    val filteredCatalog: StateFlow<List<CatalogTitle>> = combine(
-        _browseQuery,
-        _browseMediaFilter,
-        _browseGenre
-    ) { query, mediaFilter, genre ->
-        val normalizedQuery = query.trim().lowercase()
-        catalogTitles.filter { item ->
-            val matchesMedia = when (mediaFilter) {
-                MediaFilter.ALL -> true
-                MediaFilter.MOVIES -> item.mediaType == MediaType.MOVIE
-                MediaFilter.SERIES -> item.mediaType == MediaType.SERIES
-            }
-            val matchesGenre = genre == "All" || item.genres.any { it.equals(genre, ignoreCase = true) }
-            val matchesQuery = normalizedQuery.isEmpty() ||
-                item.title.lowercase().contains(normalizedQuery) ||
-                item.directorOrCreator.lowercase().contains(normalizedQuery) ||
-                item.genres.any { it.lowercase().contains(normalizedQuery) } ||
-                item.cast.any { it.actor.lowercase().contains(normalizedQuery) }
-            matchesMedia && matchesGenre && matchesQuery
-        }
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
-        initialValue = catalogTitles
-    )
-
     val watchlistEntries: StateFlow<List<VaultEntry>> = combine(
         vaultEntriesState,
         _watchlistFilter,
@@ -178,11 +228,9 @@ class VaultViewModel(
         when (sort) {
             WatchlistSort.PRIORITY -> entries.sortedWith(
                 compareByDescending<VaultEntry> { it.priority }
-                    .thenByDescending { it.updatedAt ?: it.createdAt ?: Timestamp(0, 0) }
+                    .thenByDescending { maxOf(it.updatedAt, it.createdAt) }
             )
-            WatchlistSort.RECENT -> entries.sortedByDescending {
-                it.updatedAt ?: it.createdAt ?: Timestamp(0, 0)
-            }
+            WatchlistSort.RECENT -> entries.sortedByDescending { maxOf(it.updatedAt, it.createdAt) }
             WatchlistSort.YEAR -> entries.sortedByDescending { it.releaseYear }
             WatchlistSort.TITLE -> entries.sortedBy { it.title.lowercase() }
         }
@@ -201,12 +249,10 @@ class VaultViewModel(
             .filter { it.statusEnum == WatchStatus.WATCHED }
             .filterByMedia(filter)
         when (sort) {
-            WatchedSort.RECENT -> entries.sortedByDescending {
-                it.updatedAt ?: it.createdAt ?: Timestamp(0, 0)
-            }
+            WatchedSort.RECENT -> entries.sortedByDescending { maxOf(it.updatedAt, it.createdAt) }
             WatchedSort.RATING -> entries.sortedWith(
                 compareByDescending<VaultEntry> { it.userRating }
-                    .thenByDescending { it.updatedAt ?: it.createdAt ?: Timestamp(0, 0) }
+                    .thenByDescending { maxOf(it.updatedAt, it.createdAt) }
             )
             WatchedSort.YEAR -> entries.sortedByDescending { it.releaseYear }
             WatchedSort.TITLE -> entries.sortedBy { it.title.lowercase() }
@@ -224,7 +270,7 @@ class VaultViewModel(
         (state as? UiState.Success)?.data.orEmpty()
             .filter { it.hasReview || it.userRating > 0.0 }
             .filterByMedia(filter)
-            .sortedByDescending { it.updatedAt ?: it.createdAt ?: Timestamp(0, 0) }
+            .sortedByDescending { maxOf(it.updatedAt, it.createdAt) }
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
@@ -277,16 +323,420 @@ class VaultViewModel(
             initialValue = VaultStats()
         )
 
+    fun refreshTmdbFeeds() {
+        if (!tmdbRepository.hasConfiguredApiKey()) {
+            _snackbarEvents.tryEmit("Add your TMDB_API_KEY in AI Studio Secrets for live TMDB feeds.")
+            refreshOfflineFilteredBrowse()
+            return
+        }
+        loadInitialTmdbFeeds()
+    }
+
+    private fun loadInitialTmdbFeeds() {
+        sectionJob?.cancel()
+        sectionJob = viewModelScope.launch {
+            _browseUiState.update { it.copy(isLoading = true, errorMessage = null, keyConfigured = true) }
+
+            val genresDeferred = async { tmdbRepository.fetchGenres() }
+            val currentSection = _browseUiState.value.selectedSection
+            val mainDeferred = async { tmdbRepository.fetchSection(currentSection, page = 1) }
+            val topMoviesDeferred = async { tmdbRepository.fetchSection(TmdbSection.MOVIE_TOP_RATED, page = 1) }
+            val popularSeriesDeferred = async { tmdbRepository.fetchSection(TmdbSection.TV_POPULAR, page = 1) }
+            val peopleDeferred = async { tmdbRepository.fetchTrendingPeople() }
+
+            val genresResult = genresDeferred.await().getOrNull()
+            val mainResult = mainDeferred.await()
+            val topMovies = topMoviesDeferred.await().getOrNull()?.items.orEmpty()
+            val popularSeries = popularSeriesDeferred.await().getOrNull()?.items.orEmpty()
+            val trendingPeople = peopleDeferred.await().getOrNull().orEmpty()
+
+            mainResult.onSuccess { pageRes ->
+                val hero = pageRes.items.firstOrNull { it.backdropUrl.isNotBlank() }
+                    ?: pageRes.items.firstOrNull()
+                    ?: CatalogRepository.featuredTitle()
+                val acclaimed = (topMovies.take(4) + popularSeries.take(4)).distinctBy { it.id }
+
+                _browseUiState.update { state ->
+                    state.copy(
+                        isLoading = false,
+                        isLiveTmdb = true,
+                        errorMessage = null,
+                        featuredTitle = hero,
+                        trendingTitles = popularSeries.take(10),
+                        acclaimedTitles = acclaimed.ifEmpty { state.acclaimedTitles },
+                        trendingPeople = trendingPeople.take(15),
+                        sectionTitles = filterByMediaType(pageRes.items, _browseMediaFilter.value),
+                        movieGenres = genresResult?.first.orEmpty(),
+                        tvGenres = genresResult?.second.orEmpty(),
+                        currentPage = pageRes.page,
+                        totalPages = pageRes.totalPages
+                    )
+                }
+            }.onFailure { err ->
+                Log.w(TAG, "TMDB initial load failed, using curated fallback", err)
+                _browseUiState.update { state ->
+                    state.copy(
+                        isLoading = false,
+                        isLiveTmdb = false,
+                        errorMessage = "TMDB live sync unavailable (${err.localizedMessage ?: "check TMDB_API_KEY"}). Showing curated library."
+                    )
+                }
+                refreshOfflineFilteredBrowse()
+            }
+        }
+    }
+
+    fun selectTmdbSection(section: TmdbSection) {
+        _browseUiState.update {
+            it.copy(
+                selectedSection = section,
+                selectedGenreId = null,
+                selectedGenreLabel = "All",
+                searchPeople = emptyList(),
+                searchCollections = emptyList()
+            )
+        }
+        val adjustedMedia = section.mediaHint?.let { hint ->
+            if (hint == MediaType.MOVIE) MediaFilter.MOVIES else MediaFilter.SERIES
+        } ?: MediaFilter.ALL
+        _browseMediaFilter.value = adjustedMedia
+
+        if (!tmdbRepository.hasConfiguredApiKey()) {
+            refreshOfflineFilteredBrowse()
+            return
+        }
+
+        if (_browseQuery.value.isNotBlank()) {
+            triggerSearch(_browseQuery.value)
+            return
+        }
+
+        sectionJob?.cancel()
+        sectionJob = viewModelScope.launch {
+            _browseUiState.update { it.copy(isLoading = true, errorMessage = null) }
+            tmdbRepository.fetchSection(section, page = 1).onSuccess { res ->
+                _browseUiState.update { state ->
+                    state.copy(
+                        isLoading = false,
+                        isLiveTmdb = true,
+                        featuredTitle = res.items.firstOrNull { it.backdropUrl.isNotBlank() } ?: state.featuredTitle,
+                        sectionTitles = res.items,
+                        currentPage = res.page,
+                        totalPages = res.totalPages
+                    )
+                }
+            }.onFailure { err ->
+                _browseUiState.update { state ->
+                    state.copy(
+                        isLoading = false,
+                        errorMessage = err.localizedMessage ?: "Failed to load ${section.label}"
+                    )
+                }
+            }
+        }
+    }
+
+    fun selectGenre(genreId: Int?, genreLabel: String) {
+        _browseUiState.update {
+            it.copy(selectedGenreId = genreId, selectedGenreLabel = genreLabel)
+        }
+
+        if (!tmdbRepository.hasConfiguredApiKey() || !_browseUiState.value.isLiveTmdb) {
+            refreshOfflineFilteredBrowse()
+            return
+        }
+
+        if (genreId == null && _browseUiState.value.discoverSort == DiscoverSort.POPULARITY) {
+            selectTmdbSection(_browseUiState.value.selectedSection)
+            return
+        }
+
+        runDiscover()
+    }
+
+    fun selectDiscoverSort(sort: DiscoverSort) {
+        _browseUiState.update { it.copy(discoverSort = sort) }
+        if (!tmdbRepository.hasConfiguredApiKey() || !_browseUiState.value.isLiveTmdb) return
+        runDiscover()
+    }
+
+    private fun runDiscover() {
+        val state = _browseUiState.value
+        sectionJob?.cancel()
+        sectionJob = viewModelScope.launch {
+            _browseUiState.update { it.copy(isLoading = true, errorMessage = null) }
+            val mediaType = when (_browseMediaFilter.value) {
+                MediaFilter.SERIES -> MediaType.SERIES
+                else -> state.selectedSection.mediaHint ?: MediaType.MOVIE
+            }
+            tmdbRepository.discover(
+                mediaType = mediaType,
+                genreId = state.selectedGenreId,
+                sort = state.discoverSort,
+                page = 1
+            ).onSuccess { res ->
+                _browseUiState.update { current ->
+                    current.copy(
+                        isLoading = false,
+                        sectionTitles = res.items,
+                        currentPage = res.page,
+                        totalPages = res.totalPages
+                    )
+                }
+            }.onFailure { err ->
+                _browseUiState.update { current ->
+                    current.copy(
+                        isLoading = false,
+                        errorMessage = err.localizedMessage ?: "Discover query failed"
+                    )
+                }
+            }
+        }
+    }
+
+    fun selectSearchScope(scope: SearchScope) {
+        _browseUiState.update { it.copy(searchScope = scope) }
+        if (_browseQuery.value.isNotBlank() && tmdbRepository.hasConfiguredApiKey()) {
+            triggerSearch(_browseQuery.value)
+        }
+    }
+
     fun updateBrowseQuery(query: String) {
         _browseQuery.value = query
+        if (!tmdbRepository.hasConfiguredApiKey()) {
+            refreshOfflineFilteredBrowse()
+            return
+        }
+        triggerSearch(query)
+    }
+
+    private fun triggerSearch(query: String) {
+        searchJob?.cancel()
+        val trimmed = query.trim()
+        if (trimmed.isEmpty()) {
+            _browseUiState.update { it.copy(searchPeople = emptyList(), searchCollections = emptyList()) }
+            val state = _browseUiState.value
+            if (state.selectedGenreId != null) {
+                selectGenre(state.selectedGenreId, state.selectedGenreLabel)
+            } else {
+                selectTmdbSection(state.selectedSection)
+            }
+            return
+        }
+
+        searchJob = viewModelScope.launch {
+            delay(350)
+            _browseUiState.update { it.copy(isLoading = true, errorMessage = null) }
+            val activeScope = _browseUiState.value.searchScope
+            tmdbRepository.search(trimmed, activeScope, page = 1).onSuccess { bundle ->
+                _browseUiState.update { state ->
+                    state.copy(
+                        isLoading = false,
+                        isLiveTmdb = true,
+                        sectionTitles = bundle.titles,
+                        searchPeople = bundle.people,
+                        searchCollections = bundle.collections,
+                        currentPage = bundle.page,
+                        totalPages = bundle.totalPages
+                    )
+                }
+            }.onFailure { err ->
+                _browseUiState.update { state ->
+                    state.copy(
+                        isLoading = false,
+                        errorMessage = err.localizedMessage ?: "Search failed"
+                    )
+                }
+            }
+        }
     }
 
     fun updateBrowseMediaFilter(filter: MediaFilter) {
         _browseMediaFilter.value = filter
+        if (!tmdbRepository.hasConfiguredApiKey() || !_browseUiState.value.isLiveTmdb) {
+            refreshOfflineFilteredBrowse()
+            return
+        }
+        if (_browseQuery.value.isNotBlank()) {
+            val nextScope = when (filter) {
+                MediaFilter.ALL -> SearchScope.MULTI
+                MediaFilter.MOVIES -> SearchScope.MOVIES
+                MediaFilter.SERIES -> SearchScope.SERIES
+            }
+            selectSearchScope(nextScope)
+        } else {
+            val targetSection = when (filter) {
+                MediaFilter.ALL -> TmdbSection.TRENDING_ALL
+                MediaFilter.MOVIES -> if (_browseUiState.value.selectedSection.mediaHint == MediaType.MOVIE) {
+                    _browseUiState.value.selectedSection
+                } else TmdbSection.MOVIE_POPULAR
+                MediaFilter.SERIES -> if (_browseUiState.value.selectedSection.mediaHint == MediaType.SERIES) {
+                    _browseUiState.value.selectedSection
+                } else TmdbSection.TV_POPULAR
+            }
+            selectTmdbSection(targetSection)
+        }
     }
 
-    fun updateBrowseGenre(genre: String) {
-        _browseGenre.value = genre
+    fun loadNextPage() {
+        val state = _browseUiState.value
+        if (!state.canLoadMore) return
+        val nextPage = state.currentPage + 1
+
+        viewModelScope.launch {
+            _browseUiState.update { it.copy(isLoadingMore = true) }
+            val query = _browseQuery.value.trim()
+            if (query.isNotEmpty()) {
+                tmdbRepository.search(query, state.searchScope, page = nextPage).onSuccess { bundle ->
+                    _browseUiState.update { current ->
+                        current.copy(
+                            isLoadingMore = false,
+                            sectionTitles = (current.sectionTitles + bundle.titles).distinctBy { it.id },
+                            searchPeople = (current.searchPeople + bundle.people).distinctBy { it.id },
+                            searchCollections = (current.searchCollections + bundle.collections).distinctBy { it.id },
+                            currentPage = bundle.page,
+                            totalPages = bundle.totalPages
+                        )
+                    }
+                }.onFailure { err ->
+                    _browseUiState.update { it.copy(isLoadingMore = false) }
+                    _snackbarEvents.tryEmit(err.localizedMessage ?: "Unable to load next page")
+                }
+                return@launch
+            }
+
+            val result = if (state.selectedGenreId != null || state.discoverSort != DiscoverSort.POPULARITY) {
+                val mediaType = when (_browseMediaFilter.value) {
+                    MediaFilter.SERIES -> MediaType.SERIES
+                    else -> state.selectedSection.mediaHint ?: MediaType.MOVIE
+                }
+                tmdbRepository.discover(
+                    mediaType = mediaType,
+                    genreId = state.selectedGenreId,
+                    sort = state.discoverSort,
+                    page = nextPage
+                )
+            } else {
+                tmdbRepository.fetchSection(state.selectedSection, page = nextPage)
+            }
+
+            result.onSuccess { res ->
+                _browseUiState.update { current ->
+                    current.copy(
+                        isLoadingMore = false,
+                        sectionTitles = (current.sectionTitles + res.items).distinctBy { it.id },
+                        currentPage = res.page,
+                        totalPages = res.totalPages
+                    )
+                }
+            }.onFailure { err ->
+                _browseUiState.update { it.copy(isLoadingMore = false) }
+                _snackbarEvents.tryEmit(err.localizedMessage ?: "Unable to load next page")
+            }
+        }
+    }
+
+    private fun refreshOfflineFilteredBrowse() {
+        val query = _browseQuery.value.trim().lowercase()
+        val mediaFilter = _browseMediaFilter.value
+        val genre = _browseUiState.value.selectedGenreLabel
+
+        val filtered = localCatalogTitles.filter { item ->
+            val matchesMedia = when (mediaFilter) {
+                MediaFilter.ALL -> true
+                MediaFilter.MOVIES -> item.mediaType == MediaType.MOVIE
+                MediaFilter.SERIES -> item.mediaType == MediaType.SERIES
+            }
+            val matchesGenre = genre == "All" || item.genres.any { it.equals(genre, ignoreCase = true) }
+            val matchesQuery = query.isEmpty() ||
+                item.title.lowercase().contains(query) ||
+                item.directorOrCreator.lowercase().contains(query) ||
+                item.genres.any { it.lowercase().contains(query) } ||
+                item.cast.any { it.actor.lowercase().contains(query) }
+            matchesMedia && matchesGenre && matchesQuery
+        }
+
+        _browseUiState.update { state ->
+            state.copy(
+                sectionTitles = filtered,
+                currentPage = 1,
+                totalPages = 1
+            )
+        }
+    }
+
+    fun resolveCatalogTitle(titleId: String): CatalogTitle? {
+        return CatalogRepository.findById(titleId)
+            ?: tmdbRepository.findCachedById(titleId)
+    }
+
+    fun loadTitleDetails(titleId: String) {
+        val immediate = resolveCatalogTitle(titleId)
+        _detailTitle.value = immediate
+
+        if (!tmdbRepository.hasConfiguredApiKey() || TmdbRepository.parseTmdbId(titleId) == null) {
+            _isLoadingDetail.value = false
+            return
+        }
+
+        detailJob?.cancel()
+        detailJob = viewModelScope.launch {
+            _isLoadingDetail.value = true
+            tmdbRepository.fetchFullDetails(titleId)
+                .onSuccess { detailed ->
+                    _detailTitle.value = detailed
+                }
+                .onFailure { err ->
+                    Log.w(TAG, "Failed to fetch full TMDB details for $titleId", err)
+                }
+            _isLoadingDetail.value = false
+        }
+    }
+
+    fun loadPersonDetails(personId: Int) {
+        personJob?.cancel()
+        personJob = viewModelScope.launch {
+            _isLoadingPerson.value = true
+            _personDetail.value = null
+            tmdbRepository.fetchPersonDetails(personId)
+                .onSuccess { detail -> _personDetail.value = detail }
+                .onFailure { err ->
+                    _snackbarEvents.tryEmit(err.localizedMessage ?: "Failed to load person profile")
+                }
+            _isLoadingPerson.value = false
+        }
+    }
+
+    fun loadCollectionDetails(collectionId: Int) {
+        collectionJob?.cancel()
+        collectionJob = viewModelScope.launch {
+            _isLoadingCollection.value = true
+            _collectionDetail.value = null
+            tmdbRepository.fetchCollectionDetails(collectionId)
+                .onSuccess { detail -> _collectionDetail.value = detail }
+                .onFailure { err ->
+                    _snackbarEvents.tryEmit(err.localizedMessage ?: "Failed to load collection")
+                }
+            _isLoadingCollection.value = false
+        }
+    }
+
+    fun loadSeasonDetails(seriesId: Int, seasonNumber: Int) {
+        seasonJob?.cancel()
+        seasonJob = viewModelScope.launch {
+            _isLoadingSeason.value = true
+            _seasonDetail.value = null
+            tmdbRepository.fetchSeasonDetails(seriesId, seasonNumber)
+                .onSuccess { detail -> _seasonDetail.value = detail }
+                .onFailure { err ->
+                    _snackbarEvents.tryEmit(err.localizedMessage ?: "Failed to load season episodes")
+                }
+            _isLoadingSeason.value = false
+        }
+    }
+
+    fun clearSeasonDetail() {
+        _seasonDetail.value = null
     }
 
     fun updateWatchlistFilter(filter: MediaFilter) {
@@ -519,6 +969,14 @@ class VaultViewModel(
             }.onFailure { e ->
                 _snackbarEvents.tryEmit(e.localizedMessage ?: "Failed to remove entry")
             }
+        }
+    }
+
+    private fun filterByMediaType(items: List<CatalogTitle>, filter: MediaFilter): List<CatalogTitle> {
+        return when (filter) {
+            MediaFilter.ALL -> items
+            MediaFilter.MOVIES -> items.filter { it.mediaType == MediaType.MOVIE }
+            MediaFilter.SERIES -> items.filter { it.mediaType == MediaType.SERIES }
         }
     }
 

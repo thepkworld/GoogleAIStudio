@@ -23,6 +23,8 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Movie
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.Tv
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -35,12 +37,15 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.R
 import com.example.data.model.MediaType
 import com.example.data.model.WatchStatus
@@ -73,38 +78,85 @@ fun accentTintForKey(posterKey: String, titleSeed: String): Color {
 }
 
 @Composable
+fun CinemaBackdropImage(
+    imageUrl: String,
+    fallbackKey: String,
+    contentDescription: String?,
+    modifier: Modifier = Modifier
+) {
+    val fallbackRes = posterDrawableForKey(fallbackKey)
+    if (imageUrl.isNotBlank()) {
+        AsyncImage(
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(imageUrl)
+                .crossfade(true)
+                .build(),
+            placeholder = painterResource(id = fallbackRes),
+            error = painterResource(id = fallbackRes),
+            contentDescription = contentDescription,
+            contentScale = ContentScale.Crop,
+            modifier = modifier
+        )
+    } else {
+        Image(
+            painter = painterResource(id = fallbackRes),
+            contentDescription = contentDescription,
+            contentScale = ContentScale.Crop,
+            modifier = modifier
+        )
+    }
+}
+
+@Composable
 fun CinemaPosterArtwork(
     posterKey: String,
     title: String,
     mediaType: MediaType,
     modifier: Modifier = Modifier,
+    posterUrl: String = "",
     cornerRadius: Dp = 14.dp,
     showBottomBadge: Boolean = true,
     userRating: Double = 0.0,
     status: WatchStatus? = null
 ) {
     val tint = accentTintForKey(posterKey, title)
+    val fallbackRes = posterDrawableForKey(posterKey)
+
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(cornerRadius))
             .background(CinemaSlateElevated)
     ) {
-        Image(
-            painter = painterResource(id = posterDrawableForKey(posterKey)),
-            contentDescription = "$title poster artwork",
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize()
-        )
+        if (posterUrl.isNotBlank()) {
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(posterUrl)
+                    .crossfade(true)
+                    .build(),
+                placeholder = painterResource(id = fallbackRes),
+                error = painterResource(id = fallbackRes),
+                contentDescription = "$title poster artwork",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            Image(
+                painter = painterResource(id = fallbackRes),
+                contentDescription = "$title poster artwork",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
 
-        // Atmospheric color-graded scrim so each card looks editorial & unique
+        // Subtle atmospheric gradient scrim for badge legibility
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        0.0f to tint.copy(alpha = 0.14f),
-                        0.55f to CinemaObsidian.copy(alpha = 0.28f),
-                        1.0f to CinemaObsidian.copy(alpha = 0.88f)
+                        0.0f to if (posterUrl.isBlank()) tint.copy(alpha = 0.14f) else CinemaObsidian.copy(alpha = 0.18f),
+                        0.6f to Color.Transparent,
+                        1.0f to CinemaObsidian.copy(alpha = if (posterUrl.isBlank()) 0.88f else 0.65f)
                     )
                 )
         )
@@ -118,7 +170,7 @@ fun CinemaPosterArtwork(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Surface(
-                color = CinemaObsidian.copy(alpha = 0.72f),
+                color = CinemaObsidian.copy(alpha = 0.78f),
                 shape = RoundedCornerShape(6.dp),
                 border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.16f))
             ) {
@@ -165,7 +217,7 @@ fun CinemaPosterArtwork(
 
         if (showBottomBadge && userRating > 0.0) {
             Surface(
-                color = CinemaObsidian.copy(alpha = 0.82f),
+                color = CinemaObsidian.copy(alpha = 0.84f),
                 shape = RoundedCornerShape(8.dp),
                 border = BorderStroke(0.8.dp, CinemaGold.copy(alpha = 0.55f)),
                 modifier = Modifier
@@ -320,10 +372,10 @@ fun EmptyVaultState(
             )
             if (actionLabel != null && onActionClick != null) {
                 Spacer(modifier = Modifier.height(18.dp))
-                androidx.compose.material3.Button(
+                Button(
                     onClick = onActionClick,
                     shape = RoundedCornerShape(12.dp),
-                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                    colors = ButtonDefaults.buttonColors(
                         containerColor = CinemaGold,
                         contentColor = CinemaObsidian
                     ),

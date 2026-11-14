@@ -282,6 +282,7 @@ private fun ReviewJournalCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CinemaPosterArtwork(
                     posterKey = entry.posterKey,
+                    posterUrl = entry.posterUrl,
                     title = entry.title,
                     mediaType = entry.mediaTypeEnum,
                     showBottomBadge = false,

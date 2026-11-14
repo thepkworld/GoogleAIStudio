@@ -223,6 +223,7 @@ private fun WatchlistItemCard(
         ) {
             CinemaPosterArtwork(
                 posterKey = entry.posterKey,
+                posterUrl = entry.posterUrl,
                 title = entry.title,
                 mediaType = entry.mediaTypeEnum,
                 showBottomBadge = false,

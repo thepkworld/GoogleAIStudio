@@ -1,90 +1,34 @@
 package com.example.data.repository
 
 import android.content.Context
-import com.example.R
+import com.example.data.local.VaultDao
+import com.example.data.local.VaultDatabase
+import com.example.data.local.VaultEntryEntity
 import com.example.data.model.CatalogTitle
 import com.example.data.model.MediaType
 import com.example.data.model.VaultEntry
 import com.example.data.model.WatchStatus
-import com.google.firebase.Firebase
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.auth
-import com.google.firebase.firestore.DocumentSnapshot
-import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.FirebaseFirestoreException
-import com.google.firebase.firestore.snapshots
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.emitAll
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.tasks.await
 import java.util.UUID
 
 class VaultRepository(
-    private val db: FirebaseFirestore,
-    private val auth: FirebaseAuth = Firebase.auth
+    private val dao: VaultDao
 ) {
     constructor(context: Context) : this(
-        db = FirebaseFirestore.getInstance(
-            context.applicationContext.getString(R.string.firestore_database_id)
-        ),
-        auth = Firebase.auth
+        dao = VaultDatabase.getInstance(context.applicationContext).vaultDao()
     )
 
-    private fun requireUserId(): String {
-        return auth.currentUser?.uid
-            ?: throw IllegalStateException("User must be signed in with Google before accessing Firestore.")
-    }
-
-    private fun userVaultCollection(uid: String) =
-        db.collection("users").document(uid).collection("vaultEntries")
-
-    fun observeVaultEntries(userId: String): Flow<List<VaultEntry>> = flow {
-        val path = "users/$userId/vaultEntries"
-        emitAll(
-            userVaultCollection(userId)
-                .snapshots()
-                .map { snapshot ->
-                    snapshot.toObjects(
-                        VaultEntry::class.java,
-                        DocumentSnapshot.ServerTimestampBehavior.ESTIMATE
-                    )
-                }
-                .catch { error ->
-                    val firestoreError = generateSequence(error) { it.cause }
-                        .filterIsInstance<FirebaseFirestoreException>()
-                        .firstOrNull()
-                    if (firestoreError == null && error is CancellationException) throw error
-                    val exceptionToLog = firestoreError ?: (error as? Exception)
-                    if (exceptionToLog != null && auth.currentUser?.uid == userId) {
-                        handleFirestoreError(exceptionToLog, OperationType.LIST, path, auth)
-                    }
-                    throw error
-                }
-        )
-    }
+    fun observeVaultEntries(): Flow<List<VaultEntry>> =
+        dao.observeAllEntries().map { entities -> entities.map { it.toDomain() } }
 
     suspend fun getVaultEntry(entryId: String): Result<VaultEntry?> {
-        val uid = requireUserId()
-        val docRef = userVaultCollection(uid).document(entryId)
         return try {
-            val snapshot = docRef.get().await()
-            val entry = if (snapshot.exists()) {
-                snapshot.toObject(
-                    VaultEntry::class.java,
-                    DocumentSnapshot.ServerTimestampBehavior.ESTIMATE
-                )
-            } else {
-                null
-            }
-            Result.success(entry)
+            Result.success(dao.getEntryById(entryId)?.toDomain())
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            handleFirestoreError(e, OperationType.GET, docRef.path, auth)
             Result.failure(e)
         }
     }
@@ -99,55 +43,62 @@ class VaultRepository(
         favoriteQuote: String = "",
         containsSpoilers: Boolean = false
     ): Result<String> {
-        val uid = requireUserId()
-        val docRef = userVaultCollection(uid).document(catalogTitle.id)
         return try {
-            val existing = docRef.get().await()
-            if (!existing.exists()) {
+            val now = System.currentTimeMillis()
+            val existing = dao.getEntryById(catalogTitle.id)
+            if (existing == null) {
                 val episodesWatched = if (targetStatus == WatchStatus.WATCHED && catalogTitle.mediaType == MediaType.SERIES) {
                     catalogTitle.totalEpisodes.toLong()
                 } else {
                     0L
                 }
-                val payload = mapOf(
-                    "userId" to uid,
-                    "catalogId" to catalogTitle.id,
-                    "title" to catalogTitle.title.take(160),
-                    "mediaType" to catalogTitle.mediaType.value,
-                    "status" to targetStatus.value,
-                    "priority" to isPriority,
-                    "releaseYear" to catalogTitle.releaseYear.toLong(),
-                    "genres" to catalogTitle.genres.take(10),
-                    "directorOrCreator" to catalogTitle.directorOrCreator.take(120),
-                    "runtimeOrSeasons" to catalogTitle.runtimeOrSeasons.take(60),
-                    "synopsis" to catalogTitle.synopsis.take(1500),
-                    "posterKey" to catalogTitle.posterKey.take(40),
-                    "userRating" to userRating.coerceIn(0.0, 10.0),
-                    "reviewTitle" to reviewTitle.take(160),
-                    "reviewBody" to reviewBody.take(4000),
-                    "favoriteQuote" to favoriteQuote.take(400),
-                    "containsSpoilers" to containsSpoilers,
-                    "rewatchCount" to 0L,
-                    "episodesWatched" to episodesWatched,
-                    "totalEpisodes" to catalogTitle.totalEpisodes.toLong(),
-                    "customTitle" to false,
-                    "createdAt" to FieldValue.serverTimestamp(),
-                    "updatedAt" to FieldValue.serverTimestamp()
+                val entity = VaultEntryEntity(
+                    id = catalogTitle.id,
+                    catalogId = catalogTitle.id,
+                    tmdbId = catalogTitle.tmdbId,
+                    title = catalogTitle.title.take(160),
+                    mediaType = catalogTitle.mediaType.value,
+                    status = targetStatus.value,
+                    priority = isPriority && targetStatus == WatchStatus.WANT_TO_WATCH,
+                    releaseYear = catalogTitle.releaseYear.toLong(),
+                    genres = catalogTitle.genres.take(10),
+                    directorOrCreator = catalogTitle.directorOrCreator.take(120),
+                    runtimeOrSeasons = catalogTitle.runtimeOrSeasons.take(60),
+                    synopsis = catalogTitle.synopsis.take(1500),
+                    posterKey = catalogTitle.posterKey.take(40),
+                    posterUrl = catalogTitle.posterUrl,
+                    backdropUrl = catalogTitle.backdropUrl,
+                    userRating = userRating.coerceIn(0.0, 10.0),
+                    reviewTitle = reviewTitle.trim().take(160),
+                    reviewBody = reviewBody.trim().take(4000),
+                    favoriteQuote = favoriteQuote.trim().take(400),
+                    containsSpoilers = containsSpoilers,
+                    rewatchCount = 0L,
+                    episodesWatched = episodesWatched,
+                    totalEpisodes = catalogTitle.totalEpisodes.toLong(),
+                    customTitle = false,
+                    createdAt = now,
+                    updatedAt = now
                 )
-                docRef.set(payload).await()
+                dao.upsertEntry(entity)
             } else {
-                val updates = mapOf(
-                    "status" to targetStatus.value,
-                    "priority" to if (targetStatus == WatchStatus.WATCHED) false else isPriority,
-                    "updatedAt" to FieldValue.serverTimestamp()
+                val updated = existing.copy(
+                    status = targetStatus.value,
+                    priority = if (targetStatus == WatchStatus.WATCHED) false else isPriority,
+                    tmdbId = existing.tmdbId ?: catalogTitle.tmdbId,
+                    posterUrl = existing.posterUrl.ifBlank { catalogTitle.posterUrl },
+                    backdropUrl = existing.backdropUrl.ifBlank { catalogTitle.backdropUrl },
+                    directorOrCreator = existing.directorOrCreator.ifBlank { catalogTitle.directorOrCreator.take(120) },
+                    runtimeOrSeasons = existing.runtimeOrSeasons.ifBlank { catalogTitle.runtimeOrSeasons.take(60) },
+                    totalEpisodes = maxOf(existing.totalEpisodes, catalogTitle.totalEpisodes.toLong()),
+                    updatedAt = now
                 )
-                docRef.update(updates).await()
+                dao.upsertEntry(updated)
             }
             Result.success(catalogTitle.id)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            handleFirestoreError(e, OperationType.WRITE, docRef.path, auth)
             Result.failure(e)
         }
     }
@@ -170,47 +121,48 @@ class VaultRepository(
         containsSpoilers: Boolean = false,
         isPriority: Boolean = false
     ): Result<String> {
-        val uid = requireUserId()
-        val entryId = "custom_${UUID.randomUUID().toString().replace("-", "").take(16)}"
-        val docRef = userVaultCollection(uid).document(entryId)
-        val clampedTotalEpisodes = totalEpisodes.coerceIn(0, 5000).toLong()
-        val episodesWatched = if (status == WatchStatus.WATCHED && mediaType == MediaType.SERIES) {
-            clampedTotalEpisodes
-        } else {
-            0L
-        }
-        val payload = mapOf(
-            "userId" to uid,
-            "catalogId" to entryId,
-            "title" to title.trim().take(160),
-            "mediaType" to mediaType.value,
-            "status" to status.value,
-            "priority" to (isPriority && status == WatchStatus.WANT_TO_WATCH),
-            "releaseYear" to releaseYear.coerceIn(1888, 2100).toLong(),
-            "genres" to genres.map { it.trim() }.filter { it.isNotEmpty() }.take(10),
-            "directorOrCreator" to directorOrCreator.trim().take(120),
-            "runtimeOrSeasons" to runtimeOrSeasons.trim().take(60),
-            "synopsis" to synopsis.trim().take(1500),
-            "posterKey" to posterKey.ifBlank { "cinema" }.take(40),
-            "userRating" to userRating.coerceIn(0.0, 10.0),
-            "reviewTitle" to reviewTitle.trim().take(160),
-            "reviewBody" to reviewBody.trim().take(4000),
-            "favoriteQuote" to favoriteQuote.trim().take(400),
-            "containsSpoilers" to containsSpoilers,
-            "rewatchCount" to 0L,
-            "episodesWatched" to episodesWatched,
-            "totalEpisodes" to clampedTotalEpisodes,
-            "customTitle" to true,
-            "createdAt" to FieldValue.serverTimestamp(),
-            "updatedAt" to FieldValue.serverTimestamp()
-        )
         return try {
-            docRef.set(payload).await()
+            val now = System.currentTimeMillis()
+            val entryId = "custom_${UUID.randomUUID().toString().replace("-", "").take(16)}"
+            val clampedTotalEpisodes = totalEpisodes.coerceIn(0, 5000).toLong()
+            val episodesWatched = if (status == WatchStatus.WATCHED && mediaType == MediaType.SERIES) {
+                clampedTotalEpisodes
+            } else {
+                0L
+            }
+            val entity = VaultEntryEntity(
+                id = entryId,
+                catalogId = entryId,
+                tmdbId = null,
+                title = title.trim().take(160),
+                mediaType = mediaType.value,
+                status = status.value,
+                priority = isPriority && status == WatchStatus.WANT_TO_WATCH,
+                releaseYear = releaseYear.coerceIn(1888, 2100).toLong(),
+                genres = genres.map { it.trim() }.filter { it.isNotEmpty() }.take(10),
+                directorOrCreator = directorOrCreator.trim().take(120),
+                runtimeOrSeasons = runtimeOrSeasons.trim().take(60),
+                synopsis = synopsis.trim().take(1500),
+                posterKey = posterKey.ifBlank { "cinema" }.take(40),
+                posterUrl = "",
+                backdropUrl = "",
+                userRating = userRating.coerceIn(0.0, 10.0),
+                reviewTitle = reviewTitle.trim().take(160),
+                reviewBody = reviewBody.trim().take(4000),
+                favoriteQuote = favoriteQuote.trim().take(400),
+                containsSpoilers = containsSpoilers,
+                rewatchCount = 0L,
+                episodesWatched = episodesWatched,
+                totalEpisodes = clampedTotalEpisodes,
+                customTitle = true,
+                createdAt = now,
+                updatedAt = now
+            )
+            dao.upsertEntry(entity)
             Result.success(entryId)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            handleFirestoreError(e, OperationType.CREATE, docRef.path, auth)
             Result.failure(e)
         }
     }
@@ -222,22 +174,21 @@ class VaultRepository(
         episodesWatched: Long,
         rewatchCount: Long
     ): Result<Unit> {
-        val uid = requireUserId()
-        val docRef = userVaultCollection(uid).document(entryId)
-        val updates = mapOf(
-            "status" to status.value,
-            "priority" to isPriority,
-            "episodesWatched" to episodesWatched.coerceIn(0L, 5000L),
-            "rewatchCount" to rewatchCount.coerceIn(0L, 1000L),
-            "updatedAt" to FieldValue.serverTimestamp()
-        )
         return try {
-            docRef.update(updates).await()
+            val existing = dao.getEntryById(entryId)
+                ?: return Result.failure(IllegalStateException("Entry not found in Vault"))
+            val updated = existing.copy(
+                status = status.value,
+                priority = if (status == WatchStatus.WATCHED) false else isPriority,
+                episodesWatched = episodesWatched.coerceIn(0L, 5000L),
+                rewatchCount = rewatchCount.coerceIn(0L, 1000L),
+                updatedAt = System.currentTimeMillis()
+            )
+            dao.upsertEntry(updated)
             Result.success(Unit)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            handleFirestoreError(e, OperationType.UPDATE, docRef.path, auth)
             Result.failure(e)
         }
     }
@@ -253,72 +204,76 @@ class VaultRepository(
         favoriteQuote: String,
         containsSpoilers: Boolean
     ): Result<Unit> {
-        val uid = requireUserId()
-        val docRef = userVaultCollection(uid).document(entryId)
         return try {
-            if (existingEntry == null && catalogTitle != null) {
+            val now = System.currentTimeMillis()
+            val currentDb = dao.getEntryById(entryId)
+            if (currentDb == null && existingEntry == null && catalogTitle != null) {
                 val episodesWatched = if (status == WatchStatus.WATCHED && catalogTitle.mediaType == MediaType.SERIES) {
                     catalogTitle.totalEpisodes.toLong()
                 } else {
                     0L
                 }
-                val payload = mapOf(
-                    "userId" to uid,
-                    "catalogId" to catalogTitle.id,
-                    "title" to catalogTitle.title.take(160),
-                    "mediaType" to catalogTitle.mediaType.value,
-                    "status" to status.value,
-                    "priority" to false,
-                    "releaseYear" to catalogTitle.releaseYear.toLong(),
-                    "genres" to catalogTitle.genres.take(10),
-                    "directorOrCreator" to catalogTitle.directorOrCreator.take(120),
-                    "runtimeOrSeasons" to catalogTitle.runtimeOrSeasons.take(60),
-                    "synopsis" to catalogTitle.synopsis.take(1500),
-                    "posterKey" to catalogTitle.posterKey.take(40),
-                    "userRating" to userRating.coerceIn(0.0, 10.0),
-                    "reviewTitle" to reviewTitle.trim().take(160),
-                    "reviewBody" to reviewBody.trim().take(4000),
-                    "favoriteQuote" to favoriteQuote.trim().take(400),
-                    "containsSpoilers" to containsSpoilers,
-                    "rewatchCount" to 0L,
-                    "episodesWatched" to episodesWatched,
-                    "totalEpisodes" to catalogTitle.totalEpisodes.toLong(),
-                    "customTitle" to false,
-                    "createdAt" to FieldValue.serverTimestamp(),
-                    "updatedAt" to FieldValue.serverTimestamp()
+                val entity = VaultEntryEntity(
+                    id = catalogTitle.id,
+                    catalogId = catalogTitle.id,
+                    tmdbId = catalogTitle.tmdbId,
+                    title = catalogTitle.title.take(160),
+                    mediaType = catalogTitle.mediaType.value,
+                    status = status.value,
+                    priority = false,
+                    releaseYear = catalogTitle.releaseYear.toLong(),
+                    genres = catalogTitle.genres.take(10),
+                    directorOrCreator = catalogTitle.directorOrCreator.take(120),
+                    runtimeOrSeasons = catalogTitle.runtimeOrSeasons.take(60),
+                    synopsis = catalogTitle.synopsis.take(1500),
+                    posterKey = catalogTitle.posterKey.take(40),
+                    posterUrl = catalogTitle.posterUrl,
+                    backdropUrl = catalogTitle.backdropUrl,
+                    userRating = userRating.coerceIn(0.0, 10.0),
+                    reviewTitle = reviewTitle.trim().take(160),
+                    reviewBody = reviewBody.trim().take(4000),
+                    favoriteQuote = favoriteQuote.trim().take(400),
+                    containsSpoilers = containsSpoilers,
+                    rewatchCount = 0L,
+                    episodesWatched = episodesWatched,
+                    totalEpisodes = catalogTitle.totalEpisodes.toLong(),
+                    customTitle = false,
+                    createdAt = now,
+                    updatedAt = now
                 )
-                docRef.set(payload).await()
+                dao.upsertEntry(entity)
             } else {
-                val updates = mapOf(
-                    "status" to status.value,
-                    "userRating" to userRating.coerceIn(0.0, 10.0),
-                    "reviewTitle" to reviewTitle.trim().take(160),
-                    "reviewBody" to reviewBody.trim().take(4000),
-                    "favoriteQuote" to favoriteQuote.trim().take(400),
-                    "containsSpoilers" to containsSpoilers,
-                    "updatedAt" to FieldValue.serverTimestamp()
+                val base = currentDb ?: existingEntry?.let { VaultEntryEntity.fromDomain(it) }
+                    ?: return Result.failure(IllegalStateException("Unable to save review for missing title"))
+                val updated = base.copy(
+                    status = status.value,
+                    userRating = userRating.coerceIn(0.0, 10.0),
+                    reviewTitle = reviewTitle.trim().take(160),
+                    reviewBody = reviewBody.trim().take(4000),
+                    favoriteQuote = favoriteQuote.trim().take(400),
+                    containsSpoilers = containsSpoilers,
+                    tmdbId = base.tmdbId ?: catalogTitle?.tmdbId,
+                    posterUrl = base.posterUrl.ifBlank { catalogTitle?.posterUrl.orEmpty() },
+                    backdropUrl = base.backdropUrl.ifBlank { catalogTitle?.backdropUrl.orEmpty() },
+                    updatedAt = now
                 )
-                docRef.update(updates).await()
+                dao.upsertEntry(updated)
             }
             Result.success(Unit)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            handleFirestoreError(e, OperationType.UPDATE, docRef.path, auth)
             Result.failure(e)
         }
     }
 
     suspend fun deleteEntry(entryId: String): Result<Unit> {
-        val uid = requireUserId()
-        val docRef = userVaultCollection(uid).document(entryId)
         return try {
-            docRef.delete().await()
+            dao.deleteEntryById(entryId)
             Result.success(Unit)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            handleFirestoreError(e, OperationType.DELETE, docRef.path, auth)
             Result.failure(e)
         }
     }
