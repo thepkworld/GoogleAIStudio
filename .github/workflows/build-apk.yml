@@ -11,10 +11,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '17'
           distribution: 'temurin'
@@ -24,6 +24,7 @@ jobs:
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
           OMDB_API_KEY: ${{ secrets.OMDB_API_KEY }}
         run: |
+          : > .env
           if [ -n "$TMDB_API_KEY" ]; then
             printf 'TMDB_API_KEY=%s\n' "$TMDB_API_KEY" >> .env
           fi
@@ -52,7 +53,7 @@ jobs:
           fi
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v5
         with:
           gradle-version: '9.3.1'
 
@@ -60,7 +61,7 @@ jobs:
         run: gradle :app:assembleDebug --no-daemon
 
       - name: Upload CinemaPaglu APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: CinemaPaglu-debug-apk
           path: app/build/outputs/apk/debug/*.apk
