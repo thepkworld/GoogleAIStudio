@@ -58,6 +58,13 @@ class VaultRepository(
                 } else {
                     0L
                 }
+                val studioText = buildString {
+                    if (catalogTitle.studioOrNetwork.isNotBlank()) {
+                        append(catalogTitle.studioOrNetwork)
+                    } else if (catalogTitle.watchProviders.isNotEmpty()) {
+                        append(catalogTitle.watchProviders.first().name)
+                    }
+                }.take(120)
                 val entity = VaultEntryEntity(
                     id = catalogTitle.id,
                     catalogId = catalogTitle.id,
@@ -83,6 +90,9 @@ class VaultRepository(
                     episodesWatched = episodesWatched,
                     totalEpisodes = catalogTitle.totalEpisodes.toLong(),
                     customTitle = false,
+                    releaseDate = catalogTitle.releaseDate.take(30),
+                    language = catalogTitle.language.take(60),
+                    studioOrNetwork = studioText,
                     watchedAt = resolvedWatchedAt,
                     createdAt = now,
                     updatedAt = now
@@ -94,6 +104,11 @@ class VaultRepository(
                     targetStatus == WatchStatus.WATCHED && existing.watchedAt <= 0L -> now
                     else -> existing.watchedAt
                 }
+                val nextStudio = existing.studioOrNetwork.ifBlank {
+                    catalogTitle.studioOrNetwork.ifBlank {
+                        catalogTitle.watchProviders.firstOrNull()?.name.orEmpty()
+                    }.take(120)
+                }
                 val updated = existing.copy(
                     status = targetStatus.value,
                     priority = if (targetStatus == WatchStatus.WATCHED) false else isPriority,
@@ -102,6 +117,9 @@ class VaultRepository(
                     backdropUrl = existing.backdropUrl.ifBlank { catalogTitle.backdropUrl },
                     directorOrCreator = existing.directorOrCreator.ifBlank { catalogTitle.directorOrCreator.take(120) },
                     runtimeOrSeasons = existing.runtimeOrSeasons.ifBlank { catalogTitle.runtimeOrSeasons.take(60) },
+                    releaseDate = existing.releaseDate.ifBlank { catalogTitle.releaseDate.take(30) },
+                    language = existing.language.ifBlank { catalogTitle.language.take(60) },
+                    studioOrNetwork = nextStudio,
                     totalEpisodes = maxOf(existing.totalEpisodes, catalogTitle.totalEpisodes.toLong()),
                     userRating = if (userRating > 0.0) userRating.coerceIn(0.0, 10.0) else existing.userRating,
                     reviewTitle = if (reviewTitle.isNotBlank()) reviewTitle.trim().take(160) else existing.reviewTitle,
@@ -276,6 +294,11 @@ class VaultRepository(
                     episodesWatched = episodesWatched,
                     totalEpisodes = catalogTitle.totalEpisodes.toLong(),
                     customTitle = false,
+                    releaseDate = catalogTitle.releaseDate.take(30),
+                    language = catalogTitle.language.take(60),
+                    studioOrNetwork = catalogTitle.studioOrNetwork.ifBlank {
+                        catalogTitle.watchProviders.firstOrNull()?.name.orEmpty()
+                    }.take(120),
                     watchedAt = resolvedWatchedAt,
                     createdAt = now,
                     updatedAt = now
@@ -311,6 +334,13 @@ class VaultRepository(
                     tmdbId = base.tmdbId ?: catalogTitle?.tmdbId,
                     posterUrl = base.posterUrl.ifBlank { catalogTitle?.posterUrl.orEmpty() },
                     backdropUrl = base.backdropUrl.ifBlank { catalogTitle?.backdropUrl.orEmpty() },
+                    releaseDate = base.releaseDate.ifBlank { catalogTitle?.releaseDate.orEmpty().take(30) },
+                    language = base.language.ifBlank { catalogTitle?.language.orEmpty().take(60) },
+                    studioOrNetwork = base.studioOrNetwork.ifBlank {
+                        catalogTitle?.studioOrNetwork?.ifBlank {
+                            catalogTitle.watchProviders.firstOrNull()?.name.orEmpty()
+                        }.orEmpty().take(120)
+                    },
                     watchedAt = nextWatchedAt,
                     updatedAt = now
                 )

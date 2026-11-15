@@ -527,6 +527,56 @@ object CatalogRepository {
                 CastMember("Bob Gunton", "Warden Norton")
             ),
             awardsHighlight = "7 Academy Award Nominations"
+        ),
+        CatalogTitle(
+            id = "horizon_odyssey_2027",
+            title = "The Odyssey",
+            tagline = "Ten years across uncharted seas.",
+            mediaType = MediaType.MOVIE,
+            releaseYear = 2027,
+            genres = listOf("Adventure", "Action", "Drama"),
+            directorOrCreator = "Christopher Nolan",
+            studioOrNetwork = "Universal Pictures",
+            country = "United States",
+            language = "English",
+            ageRating = "PG-13",
+            runtimeOrSeasons = "Upcoming",
+            totalEpisodes = 0,
+            criticScore = 8.5,
+            synopsis = "An upcoming mythic action epic following Odysseus on his perilous journey home after the fall of Troy.",
+            posterKey = "scifi",
+            cast = listOf(
+                CastMember("Matt Damon", "Odysseus"),
+                CastMember("Tom Holland", "Telemachus"),
+                CastMember("Anne Hathaway", "Penelope")
+            ),
+            releaseDate = "2027-07-16",
+            statusText = "Upcoming"
+        ),
+        CatalogTitle(
+            id = "ramayana_part_one_2027",
+            title = "Ramayana: Part One",
+            tagline = "An eternal legend reborn on the grandest canvas.",
+            mediaType = MediaType.MOVIE,
+            releaseYear = 2027,
+            genres = listOf("Drama", "Action", "Fantasy"),
+            directorOrCreator = "Nitesh Tiwari",
+            studioOrNetwork = "Prime Focus Studios",
+            country = "India",
+            language = "Hindi",
+            ageRating = "UA",
+            runtimeOrSeasons = "Upcoming",
+            totalEpisodes = 0,
+            criticScore = 8.7,
+            synopsis = "An upcoming Indian mythological epic chronicling courage, exile, and destiny across ancient kingdoms.",
+            posterKey = "drama",
+            cast = listOf(
+                CastMember("Ranbir Kapoor", "Rama"),
+                CastMember("Sai Pallavi", "Sita"),
+                CastMember("Yash", "Ravana")
+            ),
+            releaseDate = "2027-11-05",
+            statusText = "Upcoming"
         )
     )
 
@@ -551,17 +601,33 @@ object CatalogRepository {
     fun findById(id: String): CatalogTitle? = curatedTitles.firstOrNull { it.id == id }
 
     fun bollywoodFallback(): List<CatalogTitle> =
-        curatedTitles.filter { it.country.contains("India", ignoreCase = true) || it.language.contains("Hindi", ignoreCase = true) }
+        curatedTitles.filter {
+            it.isReleased && (it.country.contains("India", ignoreCase = true) || it.language.contains("Hindi", ignoreCase = true))
+        }
 
     fun hollywoodFallback(): List<CatalogTitle> =
-        curatedTitles.filter { it.mediaType == MediaType.MOVIE && it.country.contains("United States", ignoreCase = true) }
+        curatedTitles.filter {
+            it.isReleased && it.mediaType == MediaType.MOVIE && it.country.contains("United States", ignoreCase = true)
+        }
+
+    fun upcomingFallback(): List<CatalogTitle> =
+        curatedTitles.filter { !it.isReleased }
+
+    fun netflixFallback(): List<CatalogTitle> =
+        curatedTitles.filter { it.isReleased }.take(6)
+
+    fun primeFallback(): List<CatalogTitle> =
+        curatedTitles.filter { it.isReleased }.reversed().take(6)
 
     fun ottNewFallback(): List<CatalogTitle> =
-        curatedTitles.filter { it.releaseYear >= 2022 }
+        curatedTitles.filter { it.isReleased && it.releaseYear >= 2022 }
 
     fun classicFallback(): List<CatalogTitle> =
-        curatedTitles.filter { it.mediaType == MediaType.MOVIE && it.releaseYear < 2000 }
+        curatedTitles.filter { it.isReleased && it.mediaType == MediaType.MOVIE && it.releaseYear < 2000 }
 
     fun famousFallback(): List<CatalogTitle> =
-        curatedTitles.filter { it.mediaType == MediaType.MOVIE }.sortedByDescending { it.criticScore }
+        curatedTitles.filter { it.isReleased && it.mediaType == MediaType.MOVIE }.sortedByDescending { it.criticScore }
+
+    fun trendingFallback(): List<CatalogTitle> =
+        curatedTitles.filter { it.isReleased }.take(8)
 }

@@ -104,8 +104,6 @@ fun BrowseScreen(
     onTitleClick: (String) -> Unit,
     onPersonClick: (Int) -> Unit,
     onCollectionClick: (Int) -> Unit,
-    onQuickWatchlist: (CatalogTitle) -> Unit,
-    onQuickWatched: (CatalogTitle) -> Unit,
     onAddCustomClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -647,8 +645,6 @@ fun BrowseScreen(
                         item = item,
                         vaultEntry = entry,
                         onClick = { onTitleClick(item.id) },
-                        onQuickWatchlist = { onQuickWatchlist(item) },
-                        onQuickWatched = { onQuickWatched(item) },
                         modifier = Modifier.padding(horizontal = 16.dp)
                     )
                 }
@@ -883,162 +879,6 @@ private fun CollectionSearchCard(
 }
 
 @Composable
-private fun FeaturedCinemaHero(
-    title: CatalogTitle,
-    isLiveTmdb: Boolean,
-    vaultEntry: VaultEntry?,
-    onTitleClick: () -> Unit,
-    onQuickWatchlist: () -> Unit
-) {
-    Surface(
-        color = CinemaSlate,
-        shape = RoundedCornerShape(24.dp),
-        border = BorderStroke(1.dp, CinemaGold.copy(alpha = 0.28f)),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp)
-            .clip(RoundedCornerShape(24.dp))
-            .clickable(onClick = onTitleClick)
-            .testTag("featured_hero_card")
-    ) {
-        Box(modifier = Modifier.fillMaxWidth()) {
-            CinemaBackdropImage(
-                imageUrl = title.backdropUrl.ifBlank { title.posterUrl },
-                fallbackKey = title.posterKey,
-                contentDescription = "${title.title} backdrop",
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(275.dp)
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(275.dp)
-                    .background(
-                        Brush.verticalGradient(
-                            0.0f to CinemaObsidian.copy(alpha = 0.22f),
-                            0.45f to CinemaObsidian.copy(alpha = 0.72f),
-                            1.0f to CinemaObsidian.copy(alpha = 0.96f)
-                        )
-                    )
-            )
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.BottomStart)
-                    .padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Surface(
-                        color = CinemaGold,
-                        shape = RoundedCornerShape(6.dp)
-                    ) {
-                        Text(
-                            text = if (isLiveTmdb) "TMDB SPOTLIGHT" else "FEATURED PREMIERE",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = CinemaObsidian,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                    }
-                    RatingPill(score = title.criticScore)
-                    Text(
-                        text = "${title.releaseYear} · ${if (title.mediaType == MediaType.SERIES) "Series" else "Movie"}",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = CinemaSilver
-                    )
-                }
-
-                Text(
-                    text = title.title,
-                    style = MaterialTheme.typography.displayMedium,
-                    color = CinemaAlabaster,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                Text(
-                    text = title.synopsis,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = CinemaSilver,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Button(
-                        onClick = onTitleClick,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = CinemaGold,
-                            contentColor = CinemaObsidian
-                        ),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
-                        modifier = Modifier.height(44.dp)
-                    ) {
-                        Text(
-                            text = "View Details",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-
-                    val inWatchlist = vaultEntry?.statusEnum == WatchStatus.WANT_TO_WATCH
-                    val isWatched = vaultEntry?.statusEnum == WatchStatus.WATCHED
-                    OutlinedButton(
-                        onClick = onQuickWatchlist,
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(
-                            1.dp,
-                            if (isWatched) CinemaEmerald else CinemaGold.copy(alpha = 0.65f)
-                        ),
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
-                        modifier = Modifier.height(44.dp)
-                    ) {
-                        Icon(
-                            imageVector = when {
-                                isWatched -> Icons.Rounded.CheckCircle
-                                inWatchlist -> Icons.Rounded.Bookmark
-                                else -> Icons.Rounded.BookmarkBorder
-                            },
-                            contentDescription = null,
-                            tint = if (isWatched) CinemaEmerald else CinemaGold,
-                            modifier = Modifier.size(17.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = when {
-                                isWatched -> "Watched"
-                                inWatchlist -> "In Watchlist"
-                                else -> "Want to Watch"
-                            },
-                            style = MaterialTheme.typography.labelLarge,
-                            color = if (isWatched) CinemaEmerald else CinemaAlabaster
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun SpotlightPosterCard(
     title: CatalogTitle,
     vaultEntry: VaultEntry?,
@@ -1084,8 +924,6 @@ private fun CatalogListCard(
     item: CatalogTitle,
     vaultEntry: VaultEntry?,
     onClick: () -> Unit,
-    onQuickWatchlist: () -> Unit,
-    onQuickWatched: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -1168,76 +1006,6 @@ private fun CatalogListCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.padding(top = 4.dp)
-                ) {
-                    val isWatchlist = vaultEntry?.statusEnum == WatchStatus.WANT_TO_WATCH
-                    val isWatched = vaultEntry?.statusEnum == WatchStatus.WATCHED
-
-                    Surface(
-                        color = if (isWatchlist) CinemaGold.copy(alpha = 0.2f) else CinemaSlateElevated,
-                        shape = RoundedCornerShape(10.dp),
-                        border = BorderStroke(
-                            1.dp,
-                            if (isWatchlist) CinemaGold else CinemaBorderSubtle
-                        ),
-                        modifier = Modifier
-                            .height(36.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .clickable(onClick = onQuickWatchlist)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = if (isWatchlist) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
-                                contentDescription = "Add to Want to Watch",
-                                tint = if (isWatchlist) CinemaGold else CinemaSilver,
-                                modifier = Modifier.size(15.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = if (isWatchlist) "In Bucket" else "BucketList",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = if (isWatchlist) CinemaGold else CinemaAlabaster
-                            )
-                        }
-                    }
-
-                    Surface(
-                        color = if (isWatched) CinemaEmerald.copy(alpha = 0.2f) else CinemaSlateElevated,
-                        shape = RoundedCornerShape(10.dp),
-                        border = BorderStroke(
-                            1.dp,
-                            if (isWatched) CinemaEmerald else CinemaBorderSubtle
-                        ),
-                        modifier = Modifier
-                            .height(36.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .clickable(onClick = onQuickWatched)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.CheckCircle,
-                                contentDescription = "Mark Watched",
-                                tint = if (isWatched) CinemaEmerald else CinemaSilver,
-                                modifier = Modifier.size(15.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = if (isWatched) "Watched" else "Mark Seen",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = if (isWatched) CinemaEmerald else CinemaAlabaster
-                            )
-                        }
-                    }
-                }
             }
         }
     }

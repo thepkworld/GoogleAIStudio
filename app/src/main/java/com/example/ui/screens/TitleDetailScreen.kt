@@ -130,15 +130,6 @@ fun TitleDetailScreen(
     onTogglePriority: () -> Unit,
     onUpdateEpisodes: (Long) -> Unit,
     onUpdateRewatch: (Long) -> Unit,
-    onSaveReview: (
-        status: WatchStatus,
-        rating: Double,
-        reviewTitle: String,
-        reviewBody: String,
-        favoriteQuote: String,
-        containsSpoilers: Boolean,
-        watchedAt: Long?
-    ) -> Unit,
     onDeleteEntry: () -> Unit
 ) {
     val context = LocalContext.current
@@ -160,32 +151,9 @@ fun TitleDetailScreen(
         ?: vaultEntry?.backdropUrl.orEmpty()
     val totalEpisodes = catalogTitle?.totalEpisodes?.takeIf { it > 0 }
         ?: vaultEntry?.totalEpisodes?.toInt() ?: 0
+    val isReleased = catalogTitle?.isReleased ?: vaultEntry?.isReleased ?: true
 
     var showDeleteDialog by remember { mutableStateOf(false) }
-    var showDetailDatePicker by remember { mutableStateOf(false) }
-
-    var draftStars by remember(vaultEntry?.id, vaultEntry?.userRating) {
-        val initial = vaultEntry?.userRating ?: 0.0
-        mutableIntStateOf(if (initial > 0.0) initial.roundToInt().coerceIn(1, 10) else 0)
-    }
-    var draftWatchedAt by remember(vaultEntry?.id, vaultEntry?.watchedAt) {
-        val existing = vaultEntry?.effectiveWatchedAt ?: 0L
-        mutableLongStateOf(
-            if (existing > 0L) normalizeToLocalNoonMillis(existing) else todayLocalNoonMillis()
-        )
-    }
-    var draftReviewTitle by remember(vaultEntry?.id, vaultEntry?.reviewTitle) {
-        mutableStateOf(vaultEntry?.reviewTitle.orEmpty())
-    }
-    var draftReviewBody by remember(vaultEntry?.id, vaultEntry?.reviewBody) {
-        mutableStateOf(vaultEntry?.reviewBody.orEmpty())
-    }
-    var draftQuote by remember(vaultEntry?.id, vaultEntry?.favoriteQuote) {
-        mutableStateOf(vaultEntry?.favoriteQuote.orEmpty())
-    }
-    var draftSpoilers by remember(vaultEntry?.id, vaultEntry?.containsSpoilers) {
-        mutableStateOf(vaultEntry?.containsSpoilers ?: false)
-    }
 
     Box(
         modifier = Modifier
@@ -374,14 +342,14 @@ fun TitleDetailScreen(
                                 if (isWatchlist) CinemaGold else CinemaBorderSubtle
                             ),
                             modifier = Modifier
-                                .weight(1f)
+                                .weight(1.25f)
                                 .height(50.dp)
                                 .testTag("detail_want_to_watch_button")
                         ) {
                             Icon(Icons.Rounded.Bookmark, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = if (isWatchlist) "In BucketList" else "BucketList",
+                                text = if (isWatchlist) "In Bucketlist" else "Add to Bucketlist",
                                 style = MaterialTheme.typography.labelLarge,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
@@ -413,6 +381,92 @@ fun TitleDetailScreen(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
+                        }
+                    }
+
+                    if (!isReleased) {
+                        val relLabel = catalogTitle?.releaseDate?.ifBlank { vaultEntry?.releaseDate.orEmpty() }
+                            ?.ifBlank { displayYear.toString() } ?: displayYear.toString()
+                        Surface(
+                            color = CinemaGold.copy(alpha = 0.12f),
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, CinemaGold.copy(alpha = 0.35f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Today,
+                                    contentDescription = null,
+                                    tint = CinemaGold,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = "Upcoming release ($relLabel) · Can be added to Bucketlist",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = CinemaGold
+                                )
+                            }
+                        }
+                    }
+
+                    if (vaultEntry != null && vaultEntry.statusEnum == WatchStatus.WATCHED) {
+                        val intScore = if (vaultEntry.userRating > 0.0) vaultEntry.userRating.roundToInt().coerceIn(1, 10) else 0
+                        Surface(
+                            color = CinemaSlate,
+                            shape = RoundedCornerShape(16.dp),
+                            border = BorderStroke(1.dp, CinemaEmerald.copy(alpha = 0.35f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(14.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        Text(
+                                            text = "YOUR WATCH LOG",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = CinemaEmerald,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = if (intScore > 0) {
+                                                "$intScore/10 · ${RatingScale.labelFor(intScore)}"
+                                            } else {
+                                                "Watched · Tap Edit to rate 1–10"
+                                            },
+                                            style = MaterialTheme.typography.titleMedium,
+                                            color = CinemaAlabaster
+                                        )
+                                    }
+                                    TextButton(onClick = { onSetStatus(WatchStatus.WATCHED) }) {
+                                        Text("Edit Log", color = CinemaGold, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                                if (vaultEntry.effectiveWatchedAt > 0L) {
+                                    Text(
+                                        text = "Watched on ${formatWatchedDate(vaultEntry.effectiveWatchedAt)}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = CinemaSilver
+                                    )
+                                }
+                                if (vaultEntry.reviewTitle.isNotBlank()) {
+                                    Text(
+                                        text = "\"${vaultEntry.reviewTitle}\"",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontStyle = FontStyle.Italic,
+                                        color = CinemaGold
+                                    )
+                                }
+                            }
                         }
                     }
 
@@ -950,227 +1004,7 @@ fun TitleDetailScreen(
                 }
             }
 
-            // Personal Rating & Full Review Editor Section
-            item(key = "detail_review_editor") {
-                Surface(
-                    color = CinemaSlate,
-                    shape = RoundedCornerShape(22.dp),
-                    border = BorderStroke(1.dp, CinemaGold.copy(alpha = 0.35f)),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 20.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(18.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Rounded.RateReview, contentDescription = null, tint = CinemaGold, modifier = Modifier.size(22.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Your Rating & Review", style = MaterialTheme.typography.headlineSmall, color = CinemaAlabaster)
-                            }
-                            if (draftStars > 0) {
-                                TextButton(onClick = { draftStars = 0 }) {
-                                    Text("Clear", color = CinemaSilver, style = MaterialTheme.typography.labelMedium)
-                                }
-                            }
-                        }
-
-                        TenStarRatingBar(
-                            selectedStars = draftStars,
-                            onStarSelected = { star -> draftStars = star }
-                        )
-
-                        // Watched Date Selector (Today + Calendar)
-                        val isToday = isSameLocalDay(draftWatchedAt, todayLocalNoonMillis())
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text("Watched Date", style = MaterialTheme.typography.titleSmall, color = CinemaAlabaster)
-                                Text(
-                                    text = formatWatchedDate(draftWatchedAt),
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = CinemaGold,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                OutlinedButton(
-                                    onClick = { draftWatchedAt = todayLocalNoonMillis() },
-                                    shape = RoundedCornerShape(12.dp),
-                                    border = BorderStroke(1.dp, if (isToday) CinemaGold else CinemaBorderSubtle),
-                                    colors = ButtonDefaults.outlinedButtonColors(
-                                        containerColor = if (isToday) CinemaGold.copy(alpha = 0.16f) else CinemaSlateElevated,
-                                        contentColor = if (isToday) CinemaGold else CinemaAlabaster
-                                    ),
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(46.dp)
-                                ) {
-                                    Icon(Icons.Rounded.Today, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(Modifier.width(6.dp))
-                                    Text("Today", style = MaterialTheme.typography.labelLarge)
-                                }
-                                OutlinedButton(
-                                    onClick = { showDetailDatePicker = true },
-                                    shape = RoundedCornerShape(12.dp),
-                                    border = BorderStroke(1.dp, if (!isToday) CinemaGold else CinemaBorderSubtle),
-                                    colors = ButtonDefaults.outlinedButtonColors(
-                                        containerColor = if (!isToday) CinemaGold.copy(alpha = 0.16f) else CinemaSlateElevated,
-                                        contentColor = if (!isToday) CinemaGold else CinemaAlabaster
-                                    ),
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(46.dp)
-                                ) {
-                                    Icon(Icons.Rounded.CalendarMonth, contentDescription = "Pick watched date", modifier = Modifier.size(16.dp))
-                                    Spacer(Modifier.width(6.dp))
-                                    Text("Calendar", style = MaterialTheme.typography.labelLarge)
-                                }
-                            }
-                        }
-
-                        HorizontalDivider(color = CinemaBorderSubtle)
-
-                        OutlinedTextField(
-                            value = draftReviewTitle,
-                            onValueChange = { if (it.length <= 160) draftReviewTitle = it },
-                            label = { Text("Review Headline") },
-                            placeholder = { Text("e.g., Towering sci-fi cinema") },
-                            singleLine = true,
-                            shape = RoundedCornerShape(14.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = CinemaGold,
-                                unfocusedBorderColor = CinemaBorderSubtle,
-                                focusedLabelColor = CinemaGold,
-                                unfocusedLabelColor = CinemaSilver,
-                                focusedTextColor = CinemaAlabaster,
-                                unfocusedTextColor = CinemaAlabaster,
-                                cursorColor = CinemaGold
-                            ),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("review_title_input")
-                        )
-
-                        OutlinedTextField(
-                            value = draftReviewBody,
-                            onValueChange = { if (it.length <= 4000) draftReviewBody = it },
-                            label = { Text("Full Review & Notes") },
-                            placeholder = { Text("Write about direction, score, pacing, performances…") },
-                            minLines = 4,
-                            maxLines = 8,
-                            shape = RoundedCornerShape(14.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = CinemaGold,
-                                unfocusedBorderColor = CinemaBorderSubtle,
-                                focusedLabelColor = CinemaGold,
-                                unfocusedLabelColor = CinemaSilver,
-                                focusedTextColor = CinemaAlabaster,
-                                unfocusedTextColor = CinemaAlabaster,
-                                cursorColor = CinemaGold
-                            ),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("review_body_input")
-                        )
-
-                        OutlinedTextField(
-                            value = draftQuote,
-                            onValueChange = { if (it.length <= 400) draftQuote = it },
-                            label = { Text("Favorite Quote or Scene (Optional)") },
-                            leadingIcon = {
-                                Icon(Icons.Rounded.FormatQuote, contentDescription = null, tint = CinemaGold)
-                            },
-                            maxLines = 3,
-                            shape = RoundedCornerShape(14.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = CinemaGold,
-                                unfocusedBorderColor = CinemaBorderSubtle,
-                                focusedLabelColor = CinemaGold,
-                                unfocusedLabelColor = CinemaSilver,
-                                focusedTextColor = CinemaAlabaster,
-                                unfocusedTextColor = CinemaAlabaster,
-                                cursorColor = CinemaGold
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Rounded.WarningAmber,
-                                    contentDescription = null,
-                                    tint = if (draftSpoilers) CinemaCrimson else CinemaSilver,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Mark as containing spoilers", style = MaterialTheme.typography.bodyMedium, color = CinemaAlabaster)
-                            }
-                            Switch(
-                                checked = draftSpoilers,
-                                onCheckedChange = { draftSpoilers = it },
-                                colors = SwitchDefaults.colors(checkedThumbColor = CinemaObsidian, checkedTrackColor = CinemaCrimson)
-                            )
-                        }
-
-                        Button(
-                            onClick = {
-                                val targetStatus = vaultEntry?.statusEnum ?: WatchStatus.WATCHED
-                                onSaveReview(
-                                    targetStatus,
-                                    draftStars.toDouble(),
-                                    draftReviewTitle,
-                                    draftReviewBody,
-                                    draftQuote,
-                                    draftSpoilers,
-                                    if (targetStatus == WatchStatus.WATCHED) draftWatchedAt else null
-                                )
-                            },
-                            enabled = !isMutating,
-                            shape = RoundedCornerShape(14.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = CinemaGold, contentColor = CinemaObsidian),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(52.dp)
-                                .testTag("save_review_button")
-                        ) {
-                            Text(
-                                text = if (vaultEntry == null) "Save to Library & Publish Review" else "Save Rating & Review",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-            }
         }
-    }
-
-    if (showDetailDatePicker) {
-        WatchedDatePickerDialog(
-            initialLocalMillis = draftWatchedAt,
-            onDismiss = { showDetailDatePicker = false },
-            onDateSelected = { pickedLocal ->
-                draftWatchedAt = pickedLocal
-                showDetailDatePicker = false
-            }
-        )
     }
 
     if (showDeleteDialog && vaultEntry != null) {

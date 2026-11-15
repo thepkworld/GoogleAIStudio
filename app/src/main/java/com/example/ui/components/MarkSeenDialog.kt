@@ -18,8 +18,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.BookmarkAdd
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.StarBorder
 import androidx.compose.material.icons.rounded.Today
@@ -545,4 +547,120 @@ fun isSameLocalDay(aMillis: Long, bMillis: Long): Boolean {
 fun formatWatchedDate(millis: Long): String {
     if (millis <= 0L) return "Not set"
     return SimpleDateFormat("MMM d, yyyy", Locale.US).format(Date(millis))
+}
+
+@Composable
+fun UnreleasedTitleDialog(
+    title: String,
+    releaseDate: String,
+    releaseYear: Int,
+    alreadyInBucketlist: Boolean,
+    onDismiss: () -> Unit,
+    onAddToBucketlist: () -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            color = CinemaSlate,
+            shape = RoundedCornerShape(24.dp),
+            border = BorderStroke(1.dp, CinemaGold.copy(alpha = 0.45f)),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .testTag("unreleased_title_dialog")
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(22.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(CinemaGold.copy(alpha = 0.16f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Schedule,
+                        contentDescription = null,
+                        tint = CinemaGold,
+                        modifier = Modifier.size(30.dp)
+                    )
+                }
+
+                Text(
+                    text = "This movie isn’t released yet.",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = CinemaAlabaster,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+
+                val releaseInfo = if (releaseDate.isNotBlank()) {
+                    "scheduled for $releaseDate"
+                } else {
+                    "scheduled for $releaseYear"
+                }
+                Text(
+                    text = "\"$title\" is $releaseInfo. You can save it to your Bucketlist now and mark it as watched once it releases.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = CinemaSilver,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.dp, CinemaBorderSubtle),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                            .testTag("unreleased_dismiss_button")
+                    ) {
+                        Text("Got It", color = CinemaAlabaster, fontWeight = FontWeight.SemiBold)
+                    }
+
+                    if (!alreadyInBucketlist) {
+                        Button(
+                            onClick = onAddToBucketlist,
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = CinemaGold,
+                                contentColor = CinemaObsidian
+                            ),
+                            modifier = Modifier
+                                .weight(1.3f)
+                                .height(48.dp)
+                                .testTag("unreleased_bucketlist_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.BookmarkAdd,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Add to Bucketlist",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

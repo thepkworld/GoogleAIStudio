@@ -173,4 +173,68 @@ class VaultRepositoryTest {
         assertTrue(com.example.ui.components.isSameLocalDay(today, backToLocal))
         assertFalse(com.example.ui.components.isSameLocalDay(today, today - 3L * 24L * 60L * 60L * 1000L))
     }
+
+    @Test
+    fun releaseValidator_distinguishesReleasedAndUpcomingTitles() {
+        val today = java.util.Calendar.getInstance().apply {
+            set(2026, java.util.Calendar.NOVEMBER, 15, 12, 0, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }.timeInMillis
+
+        assertTrue(
+            com.example.data.model.ReleaseValidator.isReleased(
+                releaseDate = "2024-03-01",
+                releaseYear = 2024,
+                todayMillis = today
+            )
+        )
+        assertTrue(
+            com.example.data.model.ReleaseValidator.isReleased(
+                releaseDate = "2026-11-15",
+                releaseYear = 2026,
+                todayMillis = today
+            )
+        )
+        assertFalse(
+            com.example.data.model.ReleaseValidator.isReleased(
+                releaseDate = "2026-11-16",
+                releaseYear = 2026,
+                todayMillis = today
+            )
+        )
+        assertFalse(
+            com.example.data.model.ReleaseValidator.isReleased(
+                releaseDate = "",
+                releaseYear = 2028,
+                todayMillis = today
+            )
+        )
+        assertFalse(
+            com.example.data.model.ReleaseValidator.isReleased(
+                releaseDate = "",
+                releaseYear = 2026,
+                statusText = "In Production",
+                todayMillis = today
+            )
+        )
+    }
+
+    @Test
+    fun upsertFromCatalog_persistsReleaseDateLanguageAndStudio() = runTest {
+        val upcoming = CatalogRepository.upcomingFallback().first { !it.isReleased }
+        assertFalse(upcoming.isReleased)
+
+        val result = repository.upsertFromCatalog(
+            catalogTitle = upcoming,
+            targetStatus = WatchStatus.WANT_TO_WATCH,
+            isPriority = true
+        )
+        assertTrue(result.isSuccess)
+
+        val saved = repository.getVaultEntry(upcoming.id).getOrNull()!!
+        assertEquals(upcoming.releaseDate, saved.releaseDate)
+        assertEquals(upcoming.language, saved.language)
+        assertFalse(saved.isReleased)
+    }
 }
+

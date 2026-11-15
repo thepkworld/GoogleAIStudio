@@ -22,13 +22,13 @@ import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Clear
 import androidx.compose.material.icons.rounded.FilterListOff
+import androidx.compose.material.icons.rounded.Insights
 import androidx.compose.material.icons.rounded.RateReview
 import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -65,7 +65,6 @@ import com.example.ui.theme.CinemaObsidian
 import com.example.ui.theme.CinemaSilver
 import com.example.ui.theme.CinemaSlate
 import com.example.ui.theme.CinemaSlateElevated
-import java.util.Locale
 import kotlin.math.roundToInt
 
 @Composable
@@ -87,6 +86,7 @@ fun WatchedScreen(
     onSortChange: (WatchedSort) -> Unit,
     onResetFilters: () -> Unit,
     onEntryClick: (String) -> Unit,
+    onOpenStats: () -> Unit,
     onBrowseClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -102,91 +102,65 @@ fun WatchedScreen(
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Library Totals & Monthly Analytics Card
+        // Slim Library Header + Jump to Stats Tab
         item(key = "watched_summary") {
             Surface(
                 color = CinemaSlate,
-                shape = RoundedCornerShape(22.dp),
-                border = BorderStroke(1.dp, CinemaEmerald.copy(alpha = 0.30f)),
+                shape = RoundedCornerShape(18.dp),
+                border = BorderStroke(1.dp, CinemaEmerald.copy(alpha = 0.28f)),
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("library_summary_card")
             ) {
-                Column(
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                        modifier = Modifier.weight(1f)
                     ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text(
-                                text = "WATCHED LIBRARY",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = CinemaEmerald
-                            )
-                            Text(
-                                text = "Your Cinema Archive",
-                                style = MaterialTheme.typography.headlineSmall,
-                                color = CinemaAlabaster
-                            )
-                        }
-                        if (stats.ratedCount > 0) {
-                            Surface(
-                                color = CinemaGold.copy(alpha = 0.14f),
-                                shape = RoundedCornerShape(10.dp),
-                                border = BorderStroke(1.dp, CinemaGold.copy(alpha = 0.35f))
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Star,
-                                        contentDescription = null,
-                                        tint = CinemaGold,
-                                        modifier = Modifier.size(15.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = "${String.format(Locale.US, "%.1f", stats.averageRating)} · ${RatingScale.labelFor(stats.averageRating)}",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = CinemaGold,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                        }
+                        Text(
+                            text = "WATCHED LIBRARY",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = CinemaEmerald
+                        )
+                        Text(
+                            text = "${stats.totalWatched} ${if (stats.totalWatched == 1) "Title" else "Titles"} Archived",
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = CinemaAlabaster
+                        )
                     }
-
-                    HorizontalDivider(color = CinemaBorderSubtle)
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    Surface(
+                        color = CinemaGold.copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, CinemaGold.copy(alpha = 0.35f)),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable(onClick = onOpenStats)
+                            .testTag("library_open_stats_button")
                     ) {
-                        LibraryStatBox(
-                            label = "TOTAL WATCHED",
-                            value = "${stats.totalWatched}",
-                            caption = "${stats.watchedMovies} Movies · ${stats.watchedSeries} Series",
-                            accentColor = CinemaEmerald,
-                            modifier = Modifier
-                                .weight(1f)
-                                .testTag("stat_total_watched")
-                        )
-                        LibraryStatBox(
-                            label = "THIS MONTH (${stats.currentMonthLabel.uppercase()})",
-                            value = "${stats.watchedThisMonth}",
-                            caption = "${stats.watchedMoviesThisMonth} Movies · ${stats.watchedSeriesThisMonth} Series",
-                            accentColor = CinemaGold,
-                            modifier = Modifier
-                                .weight(1f)
-                                .testTag("stat_monthly_watched")
-                        )
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Insights,
+                                contentDescription = null,
+                                tint = CinemaGold,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = "View Stats",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = CinemaGold,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }
@@ -410,48 +384,6 @@ fun WatchedScreen(
                     onClick = { onEntryClick(entry.id) }
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun LibraryStatBox(
-    label: String,
-    value: String,
-    caption: String,
-    accentColor: androidx.compose.ui.graphics.Color,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        color = CinemaObsidian.copy(alpha = 0.65f),
-        shape = RoundedCornerShape(14.dp),
-        border = BorderStroke(1.dp, accentColor.copy(alpha = 0.25f)),
-        modifier = modifier
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(3.dp)
-        ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
-                color = CinemaSilver,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = value,
-                style = MaterialTheme.typography.displayMedium,
-                color = accentColor,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = caption,
-                style = MaterialTheme.typography.labelSmall,
-                color = CinemaAlabaster.copy(alpha = 0.8f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
         }
     }
 }

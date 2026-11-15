@@ -29,6 +29,7 @@ import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
@@ -186,35 +187,94 @@ class TmdbRepository(
         }
     }
 
+    private fun dateDaysOffsetIso(daysOffset: Int): String {
+        val cal = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, daysOffset) }
+        return SimpleDateFormat("yyyy-MM-dd", Locale.US).format(cal.time)
+    }
+
     suspend fun fetchBollywoodMovies(page: Int = 1): Result<List<CatalogTitle>> =
         discoverMovieRail {
+            val todayIso = dateDaysOffsetIso(0)
+            val twoYearsAgoIso = dateDaysOffsetIso(-730)
             apiService.discoverMovies(
                 page = page,
-                sortBy = "popularity.desc",
-                minVotes = 15,
+                sortBy = "primary_release_date.desc",
+                minVotes = 10,
                 withOriginalLanguage = "hi",
-                withOriginCountry = "IN"
+                withOriginCountry = "IN",
+                releaseDateGte = twoYearsAgoIso,
+                releaseDateLte = todayIso
             )
         }
 
     suspend fun fetchHollywoodMovies(page: Int = 1): Result<List<CatalogTitle>> =
         discoverMovieRail {
+            val todayIso = dateDaysOffsetIso(0)
+            val eighteenMonthsAgoIso = dateDaysOffsetIso(-540)
             apiService.discoverMovies(
                 page = page,
                 sortBy = "popularity.desc",
-                minVotes = 200,
+                minVotes = 60,
                 withOriginalLanguage = "en",
-                withOriginCountry = "US"
+                withOriginCountry = "US",
+                releaseDateGte = eighteenMonthsAgoIso,
+                releaseDateLte = todayIso
+            )
+        }
+
+    suspend fun fetchUpcomingMovies(page: Int = 1): Result<List<CatalogTitle>> =
+        discoverMovieRail {
+            val tomorrowIso = dateDaysOffsetIso(1)
+            apiService.discoverMovies(
+                page = page,
+                sortBy = "primary_release_date.asc",
+                releaseDateGte = tomorrowIso
+            )
+        }
+
+    suspend fun fetchMostAnticipatedMovies(page: Int = 1): Result<List<CatalogTitle>> =
+        discoverMovieRail {
+            val tomorrowIso = dateDaysOffsetIso(1)
+            apiService.discoverMovies(
+                page = page,
+                sortBy = "popularity.desc",
+                releaseDateGte = tomorrowIso
+            )
+        }
+
+    suspend fun fetchPopularOnNetflix(page: Int = 1): Result<List<CatalogTitle>> =
+        discoverMovieRail {
+            val todayIso = dateDaysOffsetIso(0)
+            apiService.discoverMovies(
+                page = page,
+                sortBy = "popularity.desc",
+                minVotes = 50,
+                releaseDateLte = todayIso,
+                withWatchProviders = OttPlatform.NETFLIX.providerIds,
+                watchRegion = OttPlatform.NETFLIX.region
+            )
+        }
+
+    suspend fun fetchPopularOnPrime(page: Int = 1): Result<List<CatalogTitle>> =
+        discoverMovieRail {
+            val todayIso = dateDaysOffsetIso(0)
+            apiService.discoverMovies(
+                page = page,
+                sortBy = "popularity.desc",
+                minVotes = 50,
+                releaseDateLte = todayIso,
+                withWatchProviders = OttPlatform.PRIME.providerIds,
+                watchRegion = OttPlatform.PRIME.region
             )
         }
 
     suspend fun fetchOttNewMovies(platform: OttPlatform, page: Int = 1): Result<List<CatalogTitle>> =
         discoverMovieRail {
-            val todayIso = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+            val todayIso = dateDaysOffsetIso(0)
             apiService.discoverMovies(
                 page = page,
                 sortBy = "primary_release_date.desc",
-                minVotes = 20,
+                minVotes = 15,
                 releaseDateLte = todayIso,
                 withWatchProviders = platform.providerIds,
                 watchRegion = platform.region

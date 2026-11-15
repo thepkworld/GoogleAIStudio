@@ -10,7 +10,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [VaultEntryEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 @TypeConverters(VaultConverters::class)
@@ -27,6 +27,14 @@ abstract class VaultDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE vault_entries ADD COLUMN releaseDate TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE vault_entries ADD COLUMN language TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE vault_entries ADD COLUMN studioOrNetwork TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
         fun getInstance(context: Context): VaultDatabase {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
@@ -34,7 +42,7 @@ abstract class VaultDatabase : RoomDatabase() {
                     VaultDatabase::class.java,
                     "cinevault_db"
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .fallbackToDestructiveMigration(dropAllTables = false)
                     .build()
                     .also { INSTANCE = it }

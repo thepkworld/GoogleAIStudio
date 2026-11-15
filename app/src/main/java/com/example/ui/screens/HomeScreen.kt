@@ -1,8 +1,17 @@
 package com.example.ui.screens
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,35 +33,42 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.AutoAwesome
-import androidx.compose.material.icons.rounded.Bookmark
-import androidx.compose.material.icons.rounded.BookmarkBorder
-import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.BookmarkAdd
+import androidx.compose.material.icons.rounded.Category
 import androidx.compose.material.icons.rounded.HistoryEdu
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.LiveTv
+import androidx.compose.material.icons.rounded.LocalFireDepartment
 import androidx.compose.material.icons.rounded.MovieFilter
+import androidx.compose.material.icons.rounded.NewReleases
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.Theaters
+import androidx.compose.material.icons.rounded.Upcoming
 import androidx.compose.material.icons.rounded.Whatshot
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -68,33 +84,54 @@ import com.example.data.model.MediaType
 import com.example.data.model.OttPlatform
 import com.example.data.model.PersonSummary
 import com.example.data.model.VaultEntry
-import com.example.data.model.WatchStatus
 import com.example.ui.HomeUiState
 import com.example.ui.components.CinemaBackdropImage
 import com.example.ui.components.CinemaPosterArtwork
 import com.example.ui.components.RatingPill
 import com.example.ui.theme.CinemaAlabaster
 import com.example.ui.theme.CinemaBorderSubtle
+import com.example.ui.theme.CinemaCrimson
 import com.example.ui.theme.CinemaEmerald
 import com.example.ui.theme.CinemaGold
+import com.example.ui.theme.CinemaIndigo
 import com.example.ui.theme.CinemaObsidian
 import com.example.ui.theme.CinemaSilver
 import com.example.ui.theme.CinemaSlate
 import com.example.ui.theme.CinemaSlateElevated
 
+private data class GenreCollectionCard(
+    val title: String,
+    val subtitle: String,
+    val queryGenre: String,
+    val gradientStart: Color,
+    val gradientEnd: Color
+)
+
+private val genreCollections = listOf(
+    GenreCollectionCard("Sci-Fi", "Futures & galaxies", "Science Fiction", CinemaIndigo, CinemaObsidian),
+    GenreCollectionCard("Action", "High-octane thrills", "Action", CinemaCrimson, CinemaObsidian),
+    GenreCollectionCard("Crime & Noir", "Heists & mysteries", "Crime", CinemaGold, CinemaObsidian),
+    GenreCollectionCard("Drama", "Prestige stories", "Drama", CinemaEmerald, CinemaObsidian),
+    GenreCollectionCard("Comedy", "Feel-good & sharp", "Comedy", Color(0xFF4CC9F0), CinemaObsidian),
+    GenreCollectionCard("Thriller", "Edge-of-seat tension", "Thriller", Color(0xFFF77F00), CinemaObsidian),
+    GenreCollectionCard("Animation", "Worlds imagined", "Animation", Color(0xFFB5179E), CinemaObsidian),
+    GenreCollectionCard("Romance", "Heart & chemistry", "Romance", Color(0xFFE05780), CinemaObsidian)
+)
+
 @Composable
 fun HomeScreen(
     homeState: HomeUiState,
+    recentlyAdded: List<CatalogTitle>,
     keyConfigured: Boolean,
     errorMessage: String?,
     vaultById: Map<String, VaultEntry>,
     onRefreshTmdb: () -> Unit,
     onOttPlatformSelect: (OttPlatform) -> Unit,
     onOpenSearch: () -> Unit,
+    onGenreCollectionClick: (String) -> Unit,
+    onViewAllClick: (sectionTitle: String, items: List<CatalogTitle>) -> Unit,
     onTitleClick: (String) -> Unit,
     onPersonClick: (Int) -> Unit,
-    onQuickBucketList: (CatalogTitle) -> Unit,
-    onMarkSeenClick: (CatalogTitle) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val hero = homeState.featuredTitle
@@ -102,7 +139,7 @@ fun HomeScreen(
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 96.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+        verticalArrangement = Arrangement.spacedBy(22.dp)
     ) {
         if (!keyConfigured || errorMessage != null) {
             item(key = "home_tmdb_notice") {
@@ -129,7 +166,7 @@ fun HomeScreen(
                         )
                         Text(
                             text = errorMessage
-                                ?: "Curated cinema active. Add TMDB_API_KEY in Secrets for live Bollywood, Hollywood & OTT releases.",
+                                ?: "Curated cinema active. Add TMDB_API_KEY in Secrets for live streaming & theatre feeds.",
                             style = MaterialTheme.typography.bodySmall,
                             color = CinemaSilver,
                             modifier = Modifier.weight(1f)
@@ -140,7 +177,7 @@ fun HomeScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Rounded.Refresh,
-                                contentDescription = "Retry TMDB sync",
+                                contentDescription = "Retry live sync",
                                 tint = CinemaGold,
                                 modifier = Modifier.size(18.dp)
                             )
@@ -177,9 +214,9 @@ fun HomeScreen(
                         modifier = Modifier.size(20.dp)
                     )
                     Text(
-                        text = "Search any movie, series, actor, or franchise…",
+                        text = "Search movies, series, stars, or franchises…",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = CinemaSilver.copy(alpha = 0.8f),
+                        color = CinemaSilver.copy(alpha = 0.85f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f)
@@ -188,75 +225,141 @@ fun HomeScreen(
             }
         }
 
+        // Skeleton Loader when loading initial live feeds
         if (homeState.isLoading) {
-            item(key = "home_loading") {
-                LinearProgressIndicator(
-                    color = CinemaGold,
-                    trackColor = CinemaSlateElevated,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                )
+            item(key = "home_skeleton_loader") {
+                HomeSkeletonLoader()
             }
         }
 
-        // Featured Hero Spotlight
+        // Featured Hero Spotlight (click card to open detail view — no card action buttons)
         item(key = "home_hero") {
             HomeHeroCard(
                 title = hero,
                 isLiveTmdb = homeState.isLiveTmdb,
-                vaultEntry = vaultById[hero.id],
-                onTitleClick = { onTitleClick(hero.id) },
-                onBucketClick = { onQuickBucketList(hero) },
-                onMarkSeenClick = { onMarkSeenClick(hero) }
+                onTitleClick = { onTitleClick(hero.id) }
             )
         }
 
-        // 1. Bollywood Movies Section
+        // 1. Trending Now
+        if (homeState.trendingNow.isNotEmpty()) {
+            item(key = "section_trending_now") {
+                HomeMovieRail(
+                    title = "Trending Now",
+                    subtitle = "Global hits capturing audiences today",
+                    icon = Icons.Rounded.LocalFireDepartment,
+                    accentColor = CinemaGold,
+                    items = homeState.trendingNow,
+                    vaultById = vaultById,
+                    keyPrefix = "trending",
+                    onViewAll = { onViewAllClick("Trending Now", homeState.trendingNow) },
+                    onTitleClick = onTitleClick
+                )
+            }
+        }
+
+        // 2. Latest Bollywood Movies
         if (homeState.bollywoodMovies.isNotEmpty()) {
             item(key = "section_bollywood") {
                 HomeMovieRail(
-                    title = "Bollywood Movies",
-                    subtitle = "Popular Hindi cinema & Indian hits",
+                    title = "Latest Bollywood Movies",
+                    subtitle = "Fresh Hindi cinema & Indian releases",
                     icon = Icons.Rounded.Whatshot,
                     accentColor = CinemaGold,
                     items = homeState.bollywoodMovies,
                     vaultById = vaultById,
                     keyPrefix = "bolly",
-                    onTitleClick = onTitleClick,
-                    onQuickBucketList = onQuickBucketList,
-                    onMarkSeenClick = onMarkSeenClick
+                    onViewAll = { onViewAllClick("Latest Bollywood Movies", homeState.bollywoodMovies) },
+                    onTitleClick = onTitleClick
                 )
             }
         }
 
-        // 2. Hollywood Movies Section
+        // 3. Latest Hollywood Movies
         if (homeState.hollywoodMovies.isNotEmpty()) {
             item(key = "section_hollywood") {
                 HomeMovieRail(
-                    title = "Hollywood Movies",
-                    subtitle = "Top US studio & blockbuster releases",
-                    icon = Icons.Rounded.MovieFilter,
+                    title = "Latest Hollywood Movies",
+                    subtitle = "Recent US studio & theatrical releases",
+                    icon = Icons.Rounded.Theaters,
                     accentColor = CinemaGold,
                     items = homeState.hollywoodMovies,
                     vaultById = vaultById,
                     keyPrefix = "holly",
-                    onTitleClick = onTitleClick,
-                    onQuickBucketList = onQuickBucketList,
-                    onMarkSeenClick = onMarkSeenClick
+                    onViewAll = { onViewAllClick("Latest Hollywood Movies", homeState.hollywoodMovies) },
+                    onTitleClick = onTitleClick
                 )
             }
         }
 
-        // 3. OTT Wise New Movies Section
+        // 4. Upcoming Movies
+        if (homeState.upcomingMovies.isNotEmpty()) {
+            item(key = "section_upcoming") {
+                HomeMovieRail(
+                    title = "Upcoming Movies",
+                    subtitle = "Coming soon to theatres — save to Bucketlist",
+                    icon = Icons.Rounded.Upcoming,
+                    accentColor = CinemaIndigo,
+                    items = homeState.upcomingMovies,
+                    vaultById = vaultById,
+                    keyPrefix = "upcoming",
+                    showUpcomingTag = true,
+                    onViewAll = { onViewAllClick("Upcoming Movies", homeState.upcomingMovies) },
+                    onTitleClick = onTitleClick
+                )
+            }
+        }
+
+        // 5. Popular on Netflix
+        if (homeState.netflixPopular.isNotEmpty()) {
+            item(key = "section_netflix") {
+                HomeMovieRail(
+                    title = "Popular on Netflix",
+                    subtitle = "Most-watched films streaming on Netflix",
+                    icon = Icons.Rounded.PlayCircle,
+                    accentColor = CinemaCrimson,
+                    items = homeState.netflixPopular,
+                    vaultById = vaultById,
+                    keyPrefix = "netflix",
+                    onViewAll = { onViewAllClick("Popular on Netflix", homeState.netflixPopular) },
+                    onTitleClick = onTitleClick
+                )
+            }
+        }
+
+        // 6. Popular on Amazon Prime
+        if (homeState.primePopular.isNotEmpty()) {
+            item(key = "section_prime") {
+                HomeMovieRail(
+                    title = "Popular on Amazon Prime",
+                    subtitle = "Top streaming picks on Prime Video",
+                    icon = Icons.Rounded.LiveTv,
+                    accentColor = Color(0xFF4CC9F0),
+                    items = homeState.primePopular,
+                    vaultById = vaultById,
+                    keyPrefix = "prime",
+                    onViewAll = { onViewAllClick("Popular on Amazon Prime", homeState.primePopular) },
+                    onTitleClick = onTitleClick
+                )
+            }
+        }
+
+        // 7. Latest OTT Release Movies (with platform switcher + View All)
         item(key = "section_ott_new") {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 HomeSectionHeader(
-                    title = "OTT New Movies",
-                    subtitle = "Fresh streaming drops by platform",
-                    icon = Icons.Rounded.LiveTv,
+                    title = "Latest OTT Release Movies",
+                    subtitle = "Fresh digital premieres across platforms",
+                    icon = Icons.Rounded.NewReleases,
                     accentColor = CinemaEmerald,
-                    countLabel = "${homeState.ottNewMovies.size} FILMS"
+                    onViewAll = if (homeState.ottNewMovies.isNotEmpty()) {
+                        {
+                            onViewAllClick(
+                                "Latest OTT (${homeState.selectedOttPlatform.label})",
+                                homeState.ottNewMovies
+                            )
+                        }
+                    } else null
                 )
 
                 LazyRow(
@@ -310,9 +413,7 @@ fun HomeScreen(
                             HomeMovieCard(
                                 title = item,
                                 vaultEntry = vaultById[item.id],
-                                onClick = { onTitleClick(item.id) },
-                                onBucketClick = { onQuickBucketList(item) },
-                                onMarkSeenClick = { onMarkSeenClick(item) }
+                                onClick = { onTitleClick(item.id) }
                             )
                         }
                     }
@@ -320,43 +421,100 @@ fun HomeScreen(
             }
         }
 
-        // 4. Classic Movies Section
+        // 8. Top Rated
+        if (homeState.topRatedMovies.isNotEmpty()) {
+            item(key = "section_top_rated") {
+                HomeMovieRail(
+                    title = "Top Rated",
+                    subtitle = "Critically acclaimed highest-rated cinema",
+                    icon = Icons.Rounded.Star,
+                    accentColor = CinemaGold,
+                    items = homeState.topRatedMovies,
+                    vaultById = vaultById,
+                    keyPrefix = "toprated",
+                    onViewAll = { onViewAllClick("Top Rated", homeState.topRatedMovies) },
+                    onTitleClick = onTitleClick
+                )
+            }
+        }
+
+        // 9. Most Anticipated
+        if (homeState.mostAnticipatedMovies.isNotEmpty()) {
+            item(key = "section_anticipated") {
+                HomeMovieRail(
+                    title = "Most Anticipated",
+                    subtitle = "High-buzz future releases on everyone's radar",
+                    icon = Icons.Rounded.AutoAwesome,
+                    accentColor = CinemaGold,
+                    items = homeState.mostAnticipatedMovies,
+                    vaultById = vaultById,
+                    keyPrefix = "anticipated",
+                    showUpcomingTag = true,
+                    onViewAll = { onViewAllClick("Most Anticipated", homeState.mostAnticipatedMovies) },
+                    onTitleClick = onTitleClick
+                )
+            }
+        }
+
+        // 10. Recently Added
+        if (recentlyAdded.isNotEmpty()) {
+            item(key = "section_recently_added") {
+                HomeMovieRail(
+                    title = "Recently Added",
+                    subtitle = "Latest additions to your catalogue & spotlight",
+                    icon = Icons.Rounded.BookmarkAdd,
+                    accentColor = CinemaEmerald,
+                    items = recentlyAdded,
+                    vaultById = vaultById,
+                    keyPrefix = "recent",
+                    onViewAll = { onViewAllClick("Recently Added", recentlyAdded) },
+                    onTitleClick = onTitleClick
+                )
+            }
+        }
+
+        // 11. Genre Collections
+        item(key = "section_genre_collections") {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                HomeSectionHeader(
+                    title = "Genre Collections",
+                    subtitle = "Explore curated moods & cinematic genres",
+                    icon = Icons.Rounded.Category,
+                    accentColor = CinemaGold,
+                    onViewAll = onOpenSearch
+                )
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(genreCollections, key = { it.title }) { collection ->
+                        GenreCollectionTile(
+                            item = collection,
+                            onClick = { onGenreCollectionClick(collection.queryGenre) }
+                        )
+                    }
+                }
+            }
+        }
+
+        // 12. Classic Cinema
         if (homeState.classicMovies.isNotEmpty()) {
             item(key = "section_classic") {
                 HomeMovieRail(
-                    title = "Classic Movies",
+                    title = "Classic Cinema",
                     subtitle = "Timeless pre-2000 masterworks",
                     icon = Icons.Rounded.HistoryEdu,
                     accentColor = CinemaGold,
                     items = homeState.classicMovies,
                     vaultById = vaultById,
                     keyPrefix = "classic",
-                    onTitleClick = onTitleClick,
-                    onQuickBucketList = onQuickBucketList,
-                    onMarkSeenClick = onMarkSeenClick
+                    onViewAll = { onViewAllClick("Classic Cinema", homeState.classicMovies) },
+                    onTitleClick = onTitleClick
                 )
             }
         }
 
-        // 5. Famous Movies Section
-        if (homeState.famousMovies.isNotEmpty()) {
-            item(key = "section_famous") {
-                HomeMovieRail(
-                    title = "Famous Movies",
-                    subtitle = "World's most beloved & iconic cinema",
-                    icon = Icons.Rounded.AutoAwesome,
-                    accentColor = CinemaGold,
-                    items = homeState.famousMovies,
-                    vaultById = vaultById,
-                    keyPrefix = "famous",
-                    onTitleClick = onTitleClick,
-                    onQuickBucketList = onQuickBucketList,
-                    onMarkSeenClick = onMarkSeenClick
-                )
-            }
-        }
-
-        // 6. Trending Stars & Creators
+        // 13. Trending Stars & Creators
         if (homeState.trendingPeople.isNotEmpty()) {
             item(key = "home_trending_people") {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -364,8 +522,7 @@ fun HomeScreen(
                         title = "Trending Stars & Creators",
                         subtitle = "Tap to explore biography & filmography",
                         icon = Icons.Rounded.Public,
-                        accentColor = CinemaGold,
-                        countLabel = "${homeState.trendingPeople.size} PEOPLE"
+                        accentColor = CinemaGold
                     )
                     LazyRow(
                         contentPadding = PaddingValues(horizontal = 16.dp),
@@ -385,12 +542,64 @@ fun HomeScreen(
 }
 
 @Composable
+private fun HomeSkeletonLoader() {
+    val transition = rememberInfiniteTransition(label = "skeleton_shimmer")
+    val alpha by transition.animateFloat(
+        initialValue = 0.28f,
+        targetValue = 0.65f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 850),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "skeleton_alpha"
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(160.dp)
+                    .height(18.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(CinemaSlateElevated.copy(alpha = alpha))
+            )
+            Box(
+                modifier = Modifier
+                    .width(64.dp)
+                    .height(16.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(CinemaSlateElevated.copy(alpha = alpha))
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            repeat(3) {
+                Box(
+                    modifier = Modifier
+                        .width(142.dp)
+                        .height(210.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(CinemaSlateElevated.copy(alpha = alpha))
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun HomeSectionHeader(
     title: String,
     subtitle: String,
     icon: ImageVector,
     accentColor: Color,
-    countLabel: String
+    onViewAll: (() -> Unit)? = null
 ) {
     Row(
         modifier = Modifier
@@ -435,13 +644,26 @@ private fun HomeSectionHeader(
                 )
             }
         }
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = countLabel,
-            style = MaterialTheme.typography.labelSmall,
-            color = accentColor,
-            fontWeight = FontWeight.Bold
-        )
+        if (onViewAll != null) {
+            TextButton(
+                onClick = onViewAll,
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = "View All",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = accentColor,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.width(2.dp))
+                Icon(
+                    imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
+                    contentDescription = "View all $title",
+                    tint = accentColor,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+        }
     }
 }
 
@@ -454,9 +676,9 @@ private fun HomeMovieRail(
     items: List<CatalogTitle>,
     vaultById: Map<String, VaultEntry>,
     keyPrefix: String,
-    onTitleClick: (String) -> Unit,
-    onQuickBucketList: (CatalogTitle) -> Unit,
-    onMarkSeenClick: (CatalogTitle) -> Unit
+    showUpcomingTag: Boolean = false,
+    onViewAll: () -> Unit,
+    onTitleClick: (String) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         HomeSectionHeader(
@@ -464,7 +686,7 @@ private fun HomeMovieRail(
             subtitle = subtitle,
             icon = icon,
             accentColor = accentColor,
-            countLabel = "${items.size} FILMS"
+            onViewAll = onViewAll
         )
         LazyRow(
             contentPadding = PaddingValues(horizontal = 16.dp),
@@ -474,9 +696,8 @@ private fun HomeMovieRail(
                 HomeMovieCard(
                     title = item,
                     vaultEntry = vaultById[item.id],
-                    onClick = { onTitleClick(item.id) },
-                    onBucketClick = { onQuickBucketList(item) },
-                    onMarkSeenClick = { onMarkSeenClick(item) }
+                    showUpcomingTag = showUpcomingTag || !item.isReleased,
+                    onClick = { onTitleClick(item.id) }
                 )
             }
         }
@@ -487,37 +708,83 @@ private fun HomeMovieRail(
 private fun HomeMovieCard(
     title: CatalogTitle,
     vaultEntry: VaultEntry?,
-    onClick: () -> Unit,
-    onBucketClick: () -> Unit,
-    onMarkSeenClick: () -> Unit
+    showUpcomingTag: Boolean = false,
+    onClick: () -> Unit
 ) {
-    val inBucket = vaultEntry?.statusEnum == WatchStatus.WANT_TO_WATCH
-    val isSeen = vaultEntry?.statusEnum == WatchStatus.WATCHED
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.96f else 1f,
+        animationSpec = spring(stiffness = 500f),
+        label = "card_press_scale"
+    )
 
     Surface(
         color = CinemaSlate,
         shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, CinemaBorderSubtle),
+        border = BorderStroke(
+            1.dp,
+            if (pressed) CinemaGold.copy(alpha = 0.65f) else CinemaBorderSubtle
+        ),
         modifier = Modifier
-            .width(156.dp)
+            .width(152.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
             .clip(RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
+            .testTag("home_card_${title.id}")
     ) {
         Column(
             modifier = Modifier.padding(10.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(7.dp)
         ) {
-            CinemaPosterArtwork(
-                posterKey = title.posterKey,
-                posterUrl = title.posterUrl,
-                title = title.title,
-                mediaType = title.mediaType,
-                userRating = vaultEntry?.userRating?.takeIf { it > 0.0 } ?: title.criticScore,
-                status = vaultEntry?.statusEnum,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(0.70f)
-            )
+            Box {
+                CinemaPosterArtwork(
+                    posterKey = title.posterKey,
+                    posterUrl = title.posterUrl,
+                    title = title.title,
+                    mediaType = title.mediaType,
+                    userRating = vaultEntry?.userRating?.takeIf { it > 0.0 } ?: title.criticScore,
+                    status = vaultEntry?.statusEnum,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(0.68f)
+                )
+                if (showUpcomingTag) {
+                    Surface(
+                        color = CinemaIndigo.copy(alpha = 0.92f),
+                        shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(6.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Schedule,
+                                contentDescription = null,
+                                tint = CinemaAlabaster,
+                                modifier = Modifier.size(10.dp)
+                            )
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(
+                                text = "SOON",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = CinemaAlabaster,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
 
             Text(
                 text = title.title,
@@ -528,74 +795,81 @@ private fun HomeMovieCard(
             )
 
             Text(
-                text = "${title.releaseYear} · ${title.genres.firstOrNull() ?: title.language}",
+                text = buildString {
+                    if (title.releaseDate.isNotBlank() && showUpcomingTag) {
+                        append(title.releaseDate)
+                    } else {
+                        append(title.releaseYear)
+                    }
+                    val sub = title.genres.firstOrNull() ?: title.language
+                    if (sub.isNotBlank()) {
+                        append(" · ")
+                        append(sub)
+                    }
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = CinemaSilver,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+        }
+    }
+}
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+@Composable
+private fun GenreCollectionTile(
+    item: GenreCollectionCard,
+    onClick: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, item.gradientStart.copy(alpha = 0.45f)),
+        modifier = Modifier
+            .width(154.dp)
+            .height(94.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .clickable(onClick = onClick)
+            .testTag("genre_collection_${item.title.lowercase()}")
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.linearGradient(
+                        listOf(
+                            item.gradientStart.copy(alpha = 0.34f),
+                            item.gradientEnd
+                        )
+                    )
+                )
+                .padding(14.dp)
+        ) {
+            Column(
+                modifier = Modifier.align(Alignment.BottomStart),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                Surface(
-                    color = if (inBucket) CinemaGold.copy(alpha = 0.18f) else CinemaSlateElevated,
-                    shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(
-                        1.dp,
-                        if (inBucket) CinemaGold else CinemaBorderSubtle
-                    ),
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(34.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable(onClick = onBucketClick)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = if (inBucket) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
-                            contentDescription = "Add to BucketList",
-                            tint = if (inBucket) CinemaGold else CinemaSilver,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                }
-
-                Surface(
-                    color = if (isSeen) CinemaEmerald.copy(alpha = 0.2f) else CinemaSlateElevated,
-                    shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(
-                        1.dp,
-                        if (isSeen) CinemaEmerald else CinemaBorderSubtle
-                    ),
-                    modifier = Modifier
-                        .weight(1.6f)
-                        .height(34.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable(onClick = onMarkSeenClick)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 6.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.CheckCircle,
-                            contentDescription = "Mark Seen",
-                            tint = if (isSeen) CinemaEmerald else CinemaSilver,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = if (isSeen) "Seen" else "Mark Seen",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (isSeen) CinemaEmerald else CinemaAlabaster,
-                            maxLines = 1
-                        )
-                    }
-                }
+                Text(
+                    text = item.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = CinemaAlabaster,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = item.subtitle,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = CinemaSilver,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
+            Icon(
+                imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
+                contentDescription = null,
+                tint = item.gradientStart,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .size(18.dp)
+            )
         }
     }
 }
@@ -604,15 +878,12 @@ private fun HomeMovieCard(
 private fun HomeHeroCard(
     title: CatalogTitle,
     isLiveTmdb: Boolean,
-    vaultEntry: VaultEntry?,
-    onTitleClick: () -> Unit,
-    onBucketClick: () -> Unit,
-    onMarkSeenClick: () -> Unit
+    onTitleClick: () -> Unit
 ) {
     Surface(
         color = CinemaSlate,
         shape = RoundedCornerShape(24.dp),
-        border = BorderStroke(1.dp, CinemaGold.copy(alpha = 0.28f)),
+        border = BorderStroke(1.dp, CinemaGold.copy(alpha = 0.30f)),
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
@@ -627,16 +898,16 @@ private fun HomeHeroCard(
                 contentDescription = "${title.title} backdrop",
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(260.dp)
+                    .height(250.dp)
             )
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(260.dp)
+                    .height(250.dp)
                     .background(
                         Brush.verticalGradient(
-                            0.0f to CinemaObsidian.copy(alpha = 0.20f),
-                            0.45f to CinemaObsidian.copy(alpha = 0.72f),
+                            0.0f to CinemaObsidian.copy(alpha = 0.16f),
+                            0.45f to CinemaObsidian.copy(alpha = 0.68f),
                             1.0f to CinemaObsidian.copy(alpha = 0.96f)
                         )
                     )
@@ -687,67 +958,21 @@ private fun HomeHeroCard(
                 )
 
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Button(
-                        onClick = onTitleClick,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = CinemaGold,
-                            contentColor = CinemaObsidian
-                        ),
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
-                        modifier = Modifier.height(44.dp)
-                    ) {
-                        Text("Details", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = null, modifier = Modifier.size(16.dp))
-                    }
-
-                    val inBucket = vaultEntry?.statusEnum == WatchStatus.WANT_TO_WATCH
-                    OutlinedButton(
-                        onClick = onBucketClick,
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, CinemaGold.copy(alpha = 0.65f)),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
-                        modifier = Modifier.height(44.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (inBucket) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
-                            contentDescription = null,
-                            tint = CinemaGold,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(5.dp))
-                        Text(
-                            text = if (inBucket) "In BucketList" else "BucketList",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = CinemaAlabaster
-                        )
-                    }
-
-                    val isSeen = vaultEntry?.statusEnum == WatchStatus.WATCHED
-                    OutlinedButton(
-                        onClick = onMarkSeenClick,
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, CinemaEmerald.copy(alpha = 0.7f)),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
-                        modifier = Modifier.height(44.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.CheckCircle,
-                            contentDescription = null,
-                            tint = CinemaEmerald,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = if (isSeen) "Seen" else "Seen",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = CinemaEmerald
-                        )
-                    }
+                    Icon(
+                        imageVector = Icons.Rounded.MovieFilter,
+                        contentDescription = null,
+                        tint = CinemaGold,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = "Tap to explore cast, trailers & actions",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = CinemaGold,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
             }
         }

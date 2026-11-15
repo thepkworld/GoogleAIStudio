@@ -104,17 +104,72 @@ data class VaultStats(
     val topGenres: List<Pair<String, Int>> = emptyList()
 )
 
+data class GenreStat(
+    val name: String,
+    val count: Int,
+    val averageRating: Double
+)
+
+data class ActivityBucket(
+    val label: String,
+    val moviesCount: Int,
+    val seriesCount: Int
+) {
+    val total: Int get() = moviesCount + seriesCount
+}
+
+data class DetailedStats(
+    val totalWatched: Int = 0,
+    val watchedMovies: Int = 0,
+    val watchedSeries: Int = 0,
+    val watchedThisMonth: Int = 0,
+    val watchedThisYear: Int = 0,
+    val currentMonthLabel: String = "",
+    val totalBucketlist: Int = 0,
+    val bucketlistMovies: Int = 0,
+    val bucketlistSeries: Int = 0,
+    val priorityBucketlist: Int = 0,
+    val overallCompletionRate: Float = 0f,
+    val moviesCompletionRate: Float = 0f,
+    val seriesCompletionRate: Float = 0f,
+    val totalHoursWatched: Double = 0.0,
+    val movieHoursWatched: Double = 0.0,
+    val seriesHoursWatched: Double = 0.0,
+    val totalEpisodesWatched: Long = 0L,
+    val totalEpisodesTarget: Long = 0L,
+    val episodeCompletionRate: Float = 0f,
+    val averageRating: Double = 0.0,
+    val ratedCount: Int = 0,
+    val masterpiecesCount: Int = 0,
+    val totalReviews: Int = 0,
+    val totalRewatches: Int = 0,
+    val ratingDistribution1To10: List<Int> = List(10) { 0 },
+    val genreBreakdown: List<GenreStat> = emptyList(),
+    val topRatedGenres: List<GenreStat> = emptyList(),
+    val decadeBreakdown: List<Pair<String, Int>> = emptyList(),
+    val languageBreakdown: List<Pair<String, Int>> = emptyList(),
+    val platformBreakdown: List<Pair<String, Int>> = emptyList(),
+    val monthlyActivity: List<ActivityBucket> = emptyList(),
+    val annualActivity: List<ActivityBucket> = emptyList(),
+    val topCreators: List<Pair<String, Int>> = emptyList()
+)
+
 data class HomeUiState(
     val isLoading: Boolean = false,
     val isLoadingOtt: Boolean = false,
     val isLiveTmdb: Boolean = false,
     val selectedOttPlatform: OttPlatform = OttPlatform.ALL,
     val featuredTitle: CatalogTitle = CatalogRepository.featuredTitle(),
+    val trendingNow: List<CatalogTitle> = CatalogRepository.trendingFallback(),
     val bollywoodMovies: List<CatalogTitle> = CatalogRepository.bollywoodFallback(),
     val hollywoodMovies: List<CatalogTitle> = CatalogRepository.hollywoodFallback(),
+    val upcomingMovies: List<CatalogTitle> = CatalogRepository.upcomingFallback(),
+    val netflixPopular: List<CatalogTitle> = CatalogRepository.netflixFallback(),
+    val primePopular: List<CatalogTitle> = CatalogRepository.primeFallback(),
     val ottNewMovies: List<CatalogTitle> = CatalogRepository.ottNewFallback(),
+    val topRatedMovies: List<CatalogTitle> = CatalogRepository.famousFallback(),
+    val mostAnticipatedMovies: List<CatalogTitle> = CatalogRepository.upcomingFallback(),
     val classicMovies: List<CatalogTitle> = CatalogRepository.classicFallback(),
-    val famousMovies: List<CatalogTitle> = CatalogRepository.famousFallback(),
     val trendingPeople: List<PersonSummary> = emptyList()
 )
 
@@ -470,6 +525,57 @@ class VaultViewModel(
             initialValue = VaultStats()
         )
 
+    val detailedStats: StateFlow<DetailedStats> = vaultEntriesState
+        .map { state ->
+            val all = (state as? UiState.Success)?.data.orEmpty()
+            computeDetailedStats(all)
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+            initialValue = DetailedStats()
+        )
+
+    val recentlyAddedCatalog: StateFlow<List<CatalogTitle>> = vaultEntriesState
+        .map { state ->
+            val entries = (state as? UiState.Success)?.data.orEmpty()
+                .sortedByDescending { it.createdAt }
+                .take(10)
+            if (entries.isNotEmpty()) {
+                entries.map { entry ->
+                    resolveCatalogTitle(entry.catalogId) ?: CatalogTitle(
+                        id = entry.id,
+                        title = entry.title,
+                        tagline = "",
+                        mediaType = entry.mediaTypeEnum,
+                        releaseYear = entry.releaseYear.toInt(),
+                        genres = entry.genres,
+                        directorOrCreator = entry.directorOrCreator,
+                        studioOrNetwork = entry.studioOrNetwork,
+                        country = "",
+                        language = entry.language,
+                        ageRating = "",
+                        runtimeOrSeasons = entry.runtimeOrSeasons,
+                        totalEpisodes = entry.totalEpisodes.toInt(),
+                        criticScore = entry.userRating,
+                        synopsis = entry.synopsis,
+                        posterKey = entry.posterKey,
+                        tmdbId = entry.tmdbId,
+                        posterUrl = entry.posterUrl,
+                        backdropUrl = entry.backdropUrl,
+                        releaseDate = entry.releaseDate
+                    )
+                }
+            } else {
+                CatalogRepository.allTitles().filter { it.isReleased && it.releaseYear >= 2022 }
+            }
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+            initialValue = CatalogRepository.allTitles().filter { it.isReleased && it.releaseYear >= 2022 }
+        )
+
     fun refreshTmdbFeeds() {
         if (!tmdbRepository.hasConfiguredApiKey()) {
             _snackbarEvents.tryEmit("Add your TMDB_API_KEY in AI Studio Secrets for live TMDB feeds.")
@@ -488,30 +594,39 @@ class VaultViewModel(
             val genresDeferred = async { tmdbRepository.fetchGenres() }
             val currentSection = _browseUiState.value.selectedSection
             val mainDeferred = async { tmdbRepository.fetchSection(currentSection, page = 1) }
+            val trendingDeferred = async { tmdbRepository.fetchSection(TmdbSection.TRENDING_ALL, page = 1) }
             val topMoviesDeferred = async { tmdbRepository.fetchSection(TmdbSection.MOVIE_TOP_RATED, page = 1) }
             val popularSeriesDeferred = async { tmdbRepository.fetchSection(TmdbSection.TV_POPULAR, page = 1) }
             val peopleDeferred = async { tmdbRepository.fetchTrendingPeople() }
 
             val bollywoodDeferred = async { tmdbRepository.fetchBollywoodMovies(page = 1) }
             val hollywoodDeferred = async { tmdbRepository.fetchHollywoodMovies(page = 1) }
+            val upcomingDeferred = async { tmdbRepository.fetchUpcomingMovies(page = 1) }
+            val netflixDeferred = async { tmdbRepository.fetchPopularOnNetflix(page = 1) }
+            val primeDeferred = async { tmdbRepository.fetchPopularOnPrime(page = 1) }
             val ottDeferred = async { tmdbRepository.fetchOttNewMovies(_homeUiState.value.selectedOttPlatform, page = 1) }
+            val anticipatedDeferred = async { tmdbRepository.fetchMostAnticipatedMovies(page = 1) }
             val classicDeferred = async { tmdbRepository.fetchClassicMovies(page = 1) }
-            val famousDeferred = async { tmdbRepository.fetchFamousMovies(page = 1) }
 
             val genresResult = genresDeferred.await().getOrNull()
             val mainResult = mainDeferred.await()
+            val trendingAll = trendingDeferred.await().getOrNull()?.items.orEmpty()
             val topMovies = topMoviesDeferred.await().getOrNull()?.items.orEmpty()
             val popularSeries = popularSeriesDeferred.await().getOrNull()?.items.orEmpty()
             val trendingPeople = peopleDeferred.await().getOrNull().orEmpty()
 
             val bollywood = bollywoodDeferred.await().getOrNull().orEmpty()
             val hollywood = hollywoodDeferred.await().getOrNull().orEmpty()
+            val upcoming = upcomingDeferred.await().getOrNull().orEmpty()
+            val netflix = netflixDeferred.await().getOrNull().orEmpty()
+            val prime = primeDeferred.await().getOrNull().orEmpty()
             val ottNew = ottDeferred.await().getOrNull().orEmpty()
+            val anticipated = anticipatedDeferred.await().getOrNull().orEmpty()
             val classic = classicDeferred.await().getOrNull().orEmpty()
-            val famous = famousDeferred.await().getOrNull().orEmpty()
 
             mainResult.onSuccess { pageRes ->
-                val hero = pageRes.items.firstOrNull { it.backdropUrl.isNotBlank() }
+                val hero = trendingAll.firstOrNull { it.backdropUrl.isNotBlank() && it.isReleased }
+                    ?: pageRes.items.firstOrNull { it.backdropUrl.isNotBlank() }
                     ?: pageRes.items.firstOrNull()
                     ?: CatalogRepository.featuredTitle()
                 val acclaimed = (topMovies.take(4) + popularSeries.take(4)).distinctBy { it.id }
@@ -538,11 +653,16 @@ class VaultViewModel(
                         isLoading = false,
                         isLiveTmdb = true,
                         featuredTitle = hero,
+                        trendingNow = trendingAll.ifEmpty { state.trendingNow },
                         bollywoodMovies = bollywood.ifEmpty { state.bollywoodMovies },
                         hollywoodMovies = hollywood.ifEmpty { state.hollywoodMovies },
+                        upcomingMovies = upcoming.ifEmpty { state.upcomingMovies },
+                        netflixPopular = netflix.ifEmpty { state.netflixPopular },
+                        primePopular = prime.ifEmpty { state.primePopular },
                         ottNewMovies = ottNew.ifEmpty { state.ottNewMovies },
+                        topRatedMovies = topMovies.ifEmpty { state.topRatedMovies },
+                        mostAnticipatedMovies = anticipated.ifEmpty { state.mostAnticipatedMovies },
                         classicMovies = classic.ifEmpty { state.classicMovies },
-                        famousMovies = famous.ifEmpty { state.famousMovies },
                         trendingPeople = trendingPeople.take(15)
                     )
                 }
@@ -650,6 +770,21 @@ class VaultViewModel(
         }
 
         runDiscover()
+    }
+
+    fun openGenreCollectionInSearch(genreKeyword: String) {
+        _browseQuery.value = ""
+        _browseMediaFilter.value = MediaFilter.MOVIES
+        val liveGenres = _browseUiState.value.movieGenres
+        val match = liveGenres.firstOrNull {
+            it.name.equals(genreKeyword, ignoreCase = true) ||
+                it.name.contains(genreKeyword, ignoreCase = true)
+        }
+        if (match != null) {
+            selectGenre(match.id, match.name)
+        } else {
+            selectGenre(null, genreKeyword)
+        }
     }
 
     fun selectDiscoverSort(sort: DiscoverSort) {
@@ -987,6 +1122,10 @@ class VaultViewModel(
         targetStatus: WatchStatus,
         isPriority: Boolean = false
     ) {
+        if (targetStatus == WatchStatus.WATCHED && !catalogTitle.isReleased) {
+            _snackbarEvents.tryEmit("This movie isn't released yet.")
+            return
+        }
         viewModelScope.launch {
             _isMutating.value = true
             val result = repository.upsertFromCatalog(
@@ -997,7 +1136,7 @@ class VaultViewModel(
             _isMutating.value = false
             result.onSuccess {
                 val msg = if (targetStatus == WatchStatus.WANT_TO_WATCH) {
-                    "Added \"${catalogTitle.title}\" to Want to Watch"
+                    "Added \"${catalogTitle.title}\" to Bucketlist"
                 } else {
                     "Marked \"${catalogTitle.title}\" as Watched"
                 }
@@ -1030,6 +1169,10 @@ class VaultViewModel(
     }
 
     fun moveToWatched(entry: VaultEntry) {
+        if (!entry.isReleased) {
+            _snackbarEvents.tryEmit("This movie isn't released yet.")
+            return
+        }
         viewModelScope.launch {
             val nextEpisodes = if (entry.mediaTypeEnum == MediaType.SERIES && entry.totalEpisodes > 0) {
                 entry.totalEpisodes
@@ -1061,9 +1204,9 @@ class VaultViewModel(
                 rewatchCount = entry.rewatchCount
             )
             result.onSuccess {
-                _snackbarEvents.tryEmit("Moved \"${entry.title}\" to Want to Watch")
+                _snackbarEvents.tryEmit("Moved \"${entry.title}\" to Bucketlist")
             }.onFailure { e ->
-                _snackbarEvents.tryEmit(e.localizedMessage ?: "Failed to move to watchlist")
+                _snackbarEvents.tryEmit(e.localizedMessage ?: "Failed to move to Bucketlist")
             }
         }
     }
@@ -1107,7 +1250,15 @@ class VaultViewModel(
         watchedAtMillis: Long,
         onComplete: () -> Unit = {}
     ) {
-        val targetId = existingEntry?.id ?: catalogTitle?.id ?: return
+        val released = when {
+            catalogTitle != null -> catalogTitle.isReleased
+            existingEntry != null -> existingEntry.isReleased
+            else -> true
+        }
+        if (!released) {
+            _snackbarEvents.tryEmit("This movie isn't released yet.")
+            return
+        }
         val displayName = existingEntry?.title ?: catalogTitle?.title ?: "Title"
         val cleanRating = rating.coerceIn(0, 10)
         viewModelScope.launch {
@@ -1161,6 +1312,15 @@ class VaultViewModel(
         watchedAt: Long? = null,
         onComplete: () -> Unit = {}
     ) {
+        val released = when {
+            catalogTitle != null -> catalogTitle.isReleased
+            existingEntry != null -> existingEntry.isReleased
+            else -> true
+        }
+        if (status == WatchStatus.WATCHED && !released) {
+            _snackbarEvents.tryEmit("This movie isn't released yet.")
+            return
+        }
         viewModelScope.launch {
             _isMutating.value = true
             val result = repository.saveReviewAndRating(
@@ -1272,6 +1432,191 @@ class VaultViewModel(
         if (timestamp <= 0L) return false
         val cal = Calendar.getInstance().apply { timeInMillis = timestamp }
         return cal.get(Calendar.YEAR) == targetYear
+    }
+
+    private fun computeDetailedStats(all: List<VaultEntry>): DetailedStats {
+        val watched = all.filter { it.statusEnum == WatchStatus.WATCHED }
+        val bucketlist = all.filter { it.statusEnum == WatchStatus.WANT_TO_WATCH }
+        val watchedMovies = watched.filter { it.mediaTypeEnum == MediaType.MOVIE }
+        val watchedSeries = watched.filter { it.mediaTypeEnum == MediaType.SERIES }
+        val bucketMovies = bucketlist.count { it.mediaTypeEnum == MediaType.MOVIE }
+        val bucketSeries = bucketlist.count { it.mediaTypeEnum == MediaType.SERIES }
+
+        val nowCal = Calendar.getInstance()
+        val currentYear = nowCal.get(Calendar.YEAR)
+        val currentMonth = nowCal.get(Calendar.MONTH)
+        val monthLabel = SimpleDateFormat("MMM yyyy", Locale.US).format(Date())
+
+        val watchedThisMonth = watched.count { isSameMonthYear(it.effectiveWatchedAt, currentYear, currentMonth) }
+        val watchedThisYear = watched.count { isSameYear(it.effectiveWatchedAt, currentYear) }
+
+        val totalPool = (watched.size + bucketlist.size).coerceAtLeast(1)
+        val moviesPool = (watchedMovies.size + bucketMovies).coerceAtLeast(1)
+        val seriesPool = (watchedSeries.size + bucketSeries).coerceAtLeast(1)
+
+        val movieMinutes = watchedMovies.sumOf { estimateEntryMinutes(it) * (1 + it.rewatchCount.toInt()) }
+        val seriesMinutes = watchedSeries.sumOf { estimateEntryMinutes(it) * (1 + it.rewatchCount.toInt()) }
+        val totalMinutes = movieMinutes + seriesMinutes
+
+        val seriesEntriesAll = all.filter { it.mediaTypeEnum == MediaType.SERIES }
+        val episodesWatchedTotal = seriesEntriesAll.sumOf { entry ->
+            if (entry.statusEnum == WatchStatus.WATCHED && entry.episodesWatched == 0L && entry.totalEpisodes > 0L) {
+                entry.totalEpisodes
+            } else {
+                entry.episodesWatched
+            }
+        }
+        val episodesTargetTotal = seriesEntriesAll.sumOf { maxOf(it.totalEpisodes, it.episodesWatched) }
+
+        val rated = all.filter { it.userRating > 0.0 }
+        val avgRating = if (rated.isNotEmpty()) rated.sumOf { it.userRating } / rated.size else 0.0
+        val ratingDist = IntArray(10)
+        rated.forEach { entry ->
+            val score = entry.userRating.roundToInt().coerceIn(1, 10)
+            ratingDist[score - 1]++
+        }
+
+        val genreBuckets = mutableMapOf<String, MutableList<Double>>()
+        watched.forEach { entry ->
+            entry.genres.forEach { genre ->
+                genreBuckets.getOrPut(genre) { mutableListOf() }.add(entry.userRating)
+            }
+        }
+        val genreStats = genreBuckets.entries.map { (name, ratings) ->
+            val validRatings = ratings.filter { it > 0.0 }
+            val genreAvg = if (validRatings.isNotEmpty()) validRatings.average() else 0.0
+            GenreStat(name = name, count = ratings.size, averageRating = genreAvg)
+        }.sortedByDescending { it.count }
+
+        val topRatedGenres = genreStats
+            .filter { it.averageRating > 0.0 }
+            .sortedWith(compareByDescending<GenreStat> { it.averageRating }.thenByDescending { it.count })
+
+        val decadeCounts = linkedMapOf(
+            "2020s" to 0,
+            "2010s" to 0,
+            "2000s" to 0,
+            "1990s" to 0,
+            "Pre-1990" to 0
+        )
+        watched.forEach { entry ->
+            val y = entry.releaseYear.toInt()
+            val key = when {
+                y >= 2020 -> "2020s"
+                y >= 2010 -> "2010s"
+                y >= 2000 -> "2000s"
+                y >= 1990 -> "1990s"
+                else -> "Pre-1990"
+            }
+            decadeCounts[key] = (decadeCounts[key] ?: 0) + 1
+        }
+
+        val languageCounts = mutableMapOf<String, Int>()
+        val platformCounts = mutableMapOf<String, Int>()
+        val creatorCounts = mutableMapOf<String, Int>()
+        watched.forEach { entry ->
+            val catalog = resolveCatalogTitle(entry.catalogId)
+            val lang = entry.language.ifBlank { catalog?.language.orEmpty() }
+            if (lang.isNotBlank()) {
+                lang.split("/", ",").map { it.trim() }.filter { it.isNotEmpty() }.forEach { l ->
+                    languageCounts[l] = (languageCounts[l] ?: 0) + 1
+                }
+            }
+            val studio = entry.studioOrNetwork.ifBlank {
+                catalog?.studioOrNetwork?.ifBlank {
+                    catalog.watchProviders.firstOrNull()?.name.orEmpty()
+                }.orEmpty()
+            }
+            if (studio.isNotBlank()) {
+                studio.split("/", ",").firstOrNull()?.trim()?.takeIf { it.isNotEmpty() }?.let { p ->
+                    platformCounts[p] = (platformCounts[p] ?: 0) + 1
+                }
+            }
+            if (entry.directorOrCreator.isNotBlank()) {
+                creatorCounts[entry.directorOrCreator] = (creatorCounts[entry.directorOrCreator] ?: 0) + 1
+            }
+        }
+
+        // Monthly activity over last 6 months
+        val monthFormatter = SimpleDateFormat("MMM", Locale.US)
+        val monthlyActivity = (5 downTo 0).map { offset ->
+            val cal = Calendar.getInstance().apply {
+                set(Calendar.DAY_OF_MONTH, 1)
+                add(Calendar.MONTH, -offset)
+            }
+            val y = cal.get(Calendar.YEAR)
+            val m = cal.get(Calendar.MONTH)
+            val inMonth = watched.filter { isSameMonthYear(it.effectiveWatchedAt, y, m) }
+            ActivityBucket(
+                label = monthFormatter.format(cal.time),
+                moviesCount = inMonth.count { it.mediaTypeEnum == MediaType.MOVIE },
+                seriesCount = inMonth.count { it.mediaTypeEnum == MediaType.SERIES }
+            )
+        }
+
+        // Annual activity over last 5 years
+        val annualActivity = (currentYear - 4..currentYear).map { y ->
+            val inYear = watched.filter { isSameYear(it.effectiveWatchedAt, y) }
+            ActivityBucket(
+                label = y.toString(),
+                moviesCount = inYear.count { it.mediaTypeEnum == MediaType.MOVIE },
+                seriesCount = inYear.count { it.mediaTypeEnum == MediaType.SERIES }
+            )
+        }
+
+        return DetailedStats(
+            totalWatched = watched.size,
+            watchedMovies = watchedMovies.size,
+            watchedSeries = watchedSeries.size,
+            watchedThisMonth = watchedThisMonth,
+            watchedThisYear = watchedThisYear,
+            currentMonthLabel = monthLabel,
+            totalBucketlist = bucketlist.size,
+            bucketlistMovies = bucketMovies,
+            bucketlistSeries = bucketSeries,
+            priorityBucketlist = bucketlist.count { it.priority },
+            overallCompletionRate = if (watched.isEmpty() && bucketlist.isEmpty()) 0f else watched.size.toFloat() / totalPool.toFloat(),
+            moviesCompletionRate = if (watchedMovies.isEmpty() && bucketMovies == 0) 0f else watchedMovies.size.toFloat() / moviesPool.toFloat(),
+            seriesCompletionRate = if (watchedSeries.isEmpty() && bucketSeries == 0) 0f else watchedSeries.size.toFloat() / seriesPool.toFloat(),
+            totalHoursWatched = totalMinutes / 60.0,
+            movieHoursWatched = movieMinutes / 60.0,
+            seriesHoursWatched = seriesMinutes / 60.0,
+            totalEpisodesWatched = episodesWatchedTotal,
+            totalEpisodesTarget = episodesTargetTotal,
+            episodeCompletionRate = if (episodesTargetTotal > 0L) (episodesWatchedTotal.toFloat() / episodesTargetTotal.toFloat()).coerceIn(0f, 1f) else 0f,
+            averageRating = avgRating,
+            ratedCount = rated.size,
+            masterpiecesCount = rated.count { it.userRating.roundToInt() >= 9 },
+            totalReviews = all.count { it.hasReview },
+            totalRewatches = watched.sumOf { it.rewatchCount.toInt() },
+            ratingDistribution1To10 = ratingDist.toList(),
+            genreBreakdown = genreStats.take(8),
+            topRatedGenres = topRatedGenres.take(6),
+            decadeBreakdown = decadeCounts.entries.filter { it.value > 0 || watched.isNotEmpty() }.map { it.key to it.value },
+            languageBreakdown = languageCounts.entries.sortedByDescending { it.value }.take(6).map { it.key to it.value },
+            platformBreakdown = platformCounts.entries.sortedByDescending { it.value }.take(6).map { it.key to it.value },
+            monthlyActivity = monthlyActivity,
+            annualActivity = annualActivity,
+            topCreators = creatorCounts.entries.sortedByDescending { it.value }.take(5).map { it.key to it.value }
+        )
+    }
+
+    private fun estimateEntryMinutes(entry: VaultEntry): Int {
+        if (entry.mediaTypeEnum == MediaType.SERIES) {
+            val eps = when {
+                entry.episodesWatched > 0L -> entry.episodesWatched.toInt()
+                entry.totalEpisodes > 0L -> entry.totalEpisodes.toInt()
+                else -> 8
+            }
+            return eps * 45
+        }
+        val raw = entry.runtimeOrSeasons.lowercase(Locale.US)
+        val hoursMatch = Regex("(\\d+)\\s*h").find(raw)?.groupValues?.getOrNull(1)?.toIntOrNull() ?: 0
+        val minsMatch = Regex("(\\d+)\\s*m").find(raw)?.groupValues?.getOrNull(1)?.toIntOrNull() ?: 0
+        val total = hoursMatch * 60 + minsMatch
+        if (total > 0) return total
+        val plainMin = Regex("(\\d+)").find(raw)?.groupValues?.getOrNull(1)?.toIntOrNull() ?: 0
+        return if (plainMin in 20..400) plainMin else 115
     }
 
     private companion object {

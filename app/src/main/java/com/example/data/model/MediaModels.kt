@@ -1,5 +1,62 @@
 package com.example.data.model
 
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
+
+object ReleaseValidator {
+    private val unreleasedStatuses = setOf(
+        "planned",
+        "in production",
+        "post production",
+        "rumored"
+    )
+
+    fun isReleased(
+        releaseDate: String,
+        releaseYear: Int,
+        statusText: String = "",
+        today: Calendar = Calendar.getInstance()
+    ): Boolean {
+        if (statusText.trim().lowercase(Locale.US) in unreleasedStatuses) {
+            return false
+        }
+        val cleanDate = releaseDate.trim()
+        if (cleanDate.length >= 10) {
+            val parsed = runCatching {
+                SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
+                    isLenient = false
+                }.parse(cleanDate.substring(0, 10))
+            }.getOrNull()
+            if (parsed != null) {
+                val releaseCal = Calendar.getInstance().apply { time = parsed }
+                val relYear = releaseCal.get(Calendar.YEAR)
+                val todayYear = today.get(Calendar.YEAR)
+                if (relYear != todayYear) {
+                    return relYear < todayYear
+                }
+                return releaseCal.get(Calendar.DAY_OF_YEAR) <= today.get(Calendar.DAY_OF_YEAR)
+            }
+        }
+        return releaseYear <= today.get(Calendar.YEAR)
+    }
+
+    fun isReleased(
+        releaseDate: String,
+        releaseYear: Int,
+        statusText: String = "",
+        todayMillis: Long
+    ): Boolean {
+        val cal = Calendar.getInstance().apply { timeInMillis = todayMillis }
+        return isReleased(
+            releaseDate = releaseDate,
+            releaseYear = releaseYear,
+            statusText = statusText,
+            today = cal
+        )
+    }
+}
+
 enum class MediaType(val value: String, val label: String) {
     MOVIE("movie", "Movie"),
     SERIES("series", "Series");
@@ -11,7 +68,7 @@ enum class MediaType(val value: String, val label: String) {
 }
 
 enum class WatchStatus(val value: String, val label: String) {
-    WANT_TO_WATCH("want_to_watch", "Want to Watch"),
+    WANT_TO_WATCH("want_to_watch", "Bucketlist"),
     WATCHED("watched", "Watched");
 
     companion object {
@@ -251,7 +308,14 @@ data class CatalogTitle(
     val keywords: List<String> = emptyList(),
     val collection: CollectionSummary? = null,
     val seasons: List<SeasonSummary> = emptyList()
-)
+) {
+    val isReleased: Boolean
+        get() = ReleaseValidator.isReleased(
+            releaseDate = releaseDate,
+            releaseYear = releaseYear,
+            statusText = statusText
+        )
+}
 
 data class VaultEntry(
     val id: String = "",
@@ -278,6 +342,9 @@ data class VaultEntry(
     val episodesWatched: Long = 0L,
     val totalEpisodes: Long = 0L,
     val customTitle: Boolean = false,
+    val releaseDate: String = "",
+    val language: String = "",
+    val studioOrNetwork: String = "",
     val watchedAt: Long = 0L,
     val createdAt: Long = 0L,
     val updatedAt: Long = 0L
@@ -290,6 +357,12 @@ data class VaultEntry(
 
     val hasReview: Boolean
         get() = reviewBody.isNotBlank() || reviewTitle.isNotBlank() || favoriteQuote.isNotBlank()
+
+    val isReleased: Boolean
+        get() = ReleaseValidator.isReleased(
+            releaseDate = releaseDate,
+            releaseYear = releaseYear.toInt()
+        )
 
     val effectiveWatchedAt: Long
         get() = when {

@@ -68,7 +68,6 @@ fun WatchlistScreen(
     onSortChange: (WatchlistSort) -> Unit,
     onEntryClick: (String) -> Unit,
     onTogglePriority: (VaultEntry) -> Unit,
-    onMarkWatched: (VaultEntry) -> Unit,
     onBrowseClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -176,9 +175,9 @@ fun WatchlistScreen(
             item(key = "watchlist_empty") {
                 EmptyVaultState(
                     icon = Icons.Rounded.BookmarkAdd,
-                    title = "Your BucketList is empty",
-                    subtitle = "Save movies and series from Home or Search to plan what to watch next.",
-                    actionLabel = "Search Movies & Series",
+                    title = "Your Bucketlist is empty",
+                    subtitle = "Open any movie or series from Home or Search and tap Add to Bucketlist.",
+                    actionLabel = "Explore Movies & Series",
                     onActionClick = onBrowseClick
                 )
             }
@@ -187,8 +186,7 @@ fun WatchlistScreen(
                 WatchlistItemCard(
                     entry = entry,
                     onClick = { onEntryClick(entry.id) },
-                    onTogglePriority = { onTogglePriority(entry) },
-                    onMarkWatched = { onMarkWatched(entry) }
+                    onTogglePriority = { onTogglePriority(entry) }
                 )
             }
         }
@@ -199,8 +197,7 @@ fun WatchlistScreen(
 private fun WatchlistItemCard(
     entry: VaultEntry,
     onClick: () -> Unit,
-    onTogglePriority: () -> Unit,
-    onMarkWatched: () -> Unit
+    onTogglePriority: () -> Unit
 ) {
     Surface(
         color = CinemaSlate,
@@ -327,30 +324,11 @@ private fun WatchlistItemCard(
                     }
                 }
 
-                Button(
-                    onClick = onMarkWatched,
-                    shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = CinemaEmerald.copy(alpha = 0.16f),
-                        contentColor = CinemaEmerald
-                    ),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                    modifier = Modifier
-                        .padding(top = 2.dp)
-                        .height(36.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.CheckCircle,
-                        contentDescription = null,
-                        modifier = Modifier.size(15.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "Mark Seen",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+                Text(
+                    text = "Tap card to mark seen or view details",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = CinemaGold.copy(alpha = 0.85f)
+                )
             }
         }
     }

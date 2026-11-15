@@ -30,6 +30,9 @@ data class VaultEntryEntity(
     val episodesWatched: Long,
     val totalEpisodes: Long,
     val customTitle: Boolean,
+    val releaseDate: String = "",
+    val language: String = "",
+    val studioOrNetwork: String = "",
     val watchedAt: Long = 0L,
     val createdAt: Long,
     val updatedAt: Long
@@ -59,6 +62,9 @@ data class VaultEntryEntity(
         episodesWatched = episodesWatched,
         totalEpisodes = totalEpisodes,
         customTitle = customTitle,
+        releaseDate = releaseDate,
+        language = language,
+        studioOrNetwork = studioOrNetwork,
         watchedAt = watchedAt,
         createdAt = createdAt,
         updatedAt = updatedAt
@@ -90,6 +96,9 @@ data class VaultEntryEntity(
             episodesWatched = entry.episodesWatched,
             totalEpisodes = entry.totalEpisodes,
             customTitle = entry.customTitle,
+            releaseDate = entry.releaseDate,
+            language = entry.language,
+            studioOrNetwork = entry.studioOrNetwork,
             watchedAt = entry.watchedAt,
             createdAt = entry.createdAt,
             updatedAt = entry.updatedAt
