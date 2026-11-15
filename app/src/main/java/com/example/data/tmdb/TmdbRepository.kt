@@ -148,7 +148,8 @@ class TmdbRepository(
 
     suspend fun discover(
         mediaType: MediaType,
-        genreId: Int?,
+        genreId: Int? = null,
+        genreIds: List<Int> = emptyList(),
         sort: DiscoverSort = DiscoverSort.POPULARITY,
         year: Int? = null,
         page: Int = 1
@@ -157,7 +158,8 @@ class TmdbRepository(
             return Result.failure(IllegalStateException("TMDB API key not configured"))
         }
         return try {
-            val genreParam = genreId?.toString()
+            val effectiveIds = (genreIds + listOfNotNull(genreId)).distinct()
+            val genreParam = effectiveIds.takeIf { it.isNotEmpty() }?.joinToString("|")
             val minVotes = if (sort == DiscoverSort.TOP_RATED) 150 else null
             val response = if (mediaType == MediaType.SERIES) {
                 apiService.discoverTv(

@@ -116,6 +116,7 @@ fun CinemaPosterArtwork(
     posterUrl: String = "",
     cornerRadius: Dp = 14.dp,
     showBottomBadge: Boolean = true,
+    showMediaTypeBadge: Boolean = true,
     userRating: Double = 0.0,
     status: WatchStatus? = null
 ) {
@@ -162,36 +163,39 @@ fun CinemaPosterArtwork(
         )
 
         // Top row: Media type badge & status dot
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Surface(
-                color = CinemaObsidian.copy(alpha = 0.78f),
-                shape = RoundedCornerShape(6.dp),
-                border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.16f))
+        if (showMediaTypeBadge || status != null) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
+                horizontalArrangement = if (showMediaTypeBadge) Arrangement.SpaceBetween else Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = if (mediaType == MediaType.SERIES) Icons.Rounded.Tv else Icons.Rounded.Movie,
-                        contentDescription = null,
-                        tint = CinemaGold,
-                        modifier = Modifier.size(11.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = if (mediaType == MediaType.SERIES) "SERIES" else "FILM",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = CinemaAlabaster
-                    )
+                if (showMediaTypeBadge) {
+                    Surface(
+                        color = CinemaObsidian.copy(alpha = 0.78f),
+                        shape = RoundedCornerShape(6.dp),
+                        border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.16f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = if (mediaType == MediaType.SERIES) Icons.Rounded.Tv else Icons.Rounded.Movie,
+                                contentDescription = null,
+                                tint = CinemaGold,
+                                modifier = Modifier.size(11.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = if (mediaType == MediaType.SERIES) "SERIES" else "FILM",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = CinemaAlabaster
+                            )
+                        }
+                    }
                 }
-            }
 
             if (status != null) {
                 Surface(
@@ -213,6 +217,7 @@ fun CinemaPosterArtwork(
                     }
                 }
             }
+        }
         }
 
         if (showBottomBadge && userRating > 0.0) {

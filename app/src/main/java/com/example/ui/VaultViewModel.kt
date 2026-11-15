@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.catalog.CatalogRepository
 import com.example.data.model.CatalogTitle
+import com.example.data.model.CatalogViewMode
 import com.example.data.model.CollectionDetail
 import com.example.data.model.CollectionSummary
 import com.example.data.model.DiscoverSort
@@ -96,6 +97,8 @@ data class VaultStats(
     val watchedSeriesThisMonth: Int = 0,
     val currentMonthLabel: String = "",
     val totalWatchlist: Int = 0,
+    val watchlistMovies: Int = 0,
+    val watchlistSeries: Int = 0,
     val priorityWatchlist: Int = 0,
     val averageRating: Double = 0.0,
     val ratedCount: Int = 0,
@@ -193,6 +196,9 @@ data class BrowseUiState(
     val tvGenres: List<TmdbGenre> = emptyList(),
     val selectedGenreId: Int? = null,
     val selectedGenreLabel: String = "All",
+    val selectedGenres: List<String> = emptyList(),
+    val selectedGenreIds: List<Int> = emptyList(),
+    val viewMode: CatalogViewMode = CatalogViewMode.GRID,
     val currentPage: Int = 1,
     val totalPages: Int = 1
 ) {
@@ -254,6 +260,9 @@ class VaultViewModel(
 
     private val _watchlistSort = MutableStateFlow(WatchlistSort.PRIORITY)
     val watchlistSort: StateFlow<WatchlistSort> = _watchlistSort.asStateFlow()
+
+    private val _watchlistViewMode = MutableStateFlow(CatalogViewMode.LIST)
+    val watchlistViewMode: StateFlow<CatalogViewMode> = _watchlistViewMode.asStateFlow()
 
     // Library (Watched) filters
     private val _watchedSearchQuery = MutableStateFlow("")
@@ -508,6 +517,8 @@ class VaultViewModel(
                 watchedSeriesThisMonth = watchedThisMonthList.count { it.mediaTypeEnum == MediaType.SERIES },
                 currentMonthLabel = monthLabel,
                 totalWatchlist = watchlist.size,
+                watchlistMovies = watchlist.count { it.mediaTypeEnum == MediaType.MOVIE },
+                watchlistSeries = watchlist.count { it.mediaTypeEnum == MediaType.SERIES },
                 priorityWatchlist = watchlist.count { it.priority },
                 averageRating = avg,
                 ratedCount = rated.size,
@@ -710,6 +721,8 @@ class VaultViewModel(
                 selectedSection = section,
                 selectedGenreId = null,
                 selectedGenreLabel = "All",
+                selectedGenres = emptyList(),
+                selectedGenreIds = emptyList(),
                 searchPeople = emptyList(),
                 searchCollections = emptyList()
             )
@@ -755,17 +768,77 @@ class VaultViewModel(
     }
 
     fun selectGenre(genreId: Int?, genreLabel: String) {
+        val nextGenres = if (genreLabel.equals("All", ignoreCase = true)) emptyList() else listOf(genreLabel)
+        val nextIds = if (genreId == null || genreLabel.equals("All", ignoreCase = true)) emptyList() else listOf(genreId)
         _browseUiState.update {
-            it.copy(selectedGenreId = genreId, selectedGenreLabel = genreLabel)
+            it.copy(
+                selectedGenreId = nextIds.firstOrNull(),
+                selectedGenreLabel = nextGenres.joinToString(", ").ifBlank { "All" },
+                selectedGenres = nextGenres,
+                selectedGenreIds = nextIds
+            )
+        }
+        applyGenreFilterUpdate()
+    }
+
+    fun toggleBrowseGenre(genreId: Int?, genreName: String) {
+        if (genreName.equals("All", ignoreCase = true)) {
+            clearBrowseGenres()
+            return
+        }
+        val currentGenres = _browseUiState.value.selectedGenres
+        val currentIds = _browseUiState.value.selectedGenreIds
+        val removing = currentGenres.any { it.equals(genreName, ignoreCase = true) }
+
+        val nextGenres = if (removing) {
+            currentGenres.filterNot { it.equals(genreName, ignoreCase = true) }
+        } else {
+            (currentGenres + genreName).distinct()
         }
 
+        val nextIds = if (genreId != null) {
+            if (removing) currentIds.filterNot { it == genreId } else (currentIds + genreId).distinct()
+        } else {
+            currentIds
+        }
+
+        _browseUiState.update {
+            it.copy(
+                selectedGenres = nextGenres,
+                selectedGenreIds = nextIds,
+                selectedGenreId = nextIds.firstOrNull(),
+                selectedGenreLabel = nextGenres.joinToString(", ").ifBlank { "All" }
+            )
+        }
+        applyGenreFilterUpdate()
+    }
+
+    fun clearBrowseGenres() {
+        _browseUiState.update {
+            it.copy(
+                selectedGenres = emptyList(),
+                selectedGenreIds = emptyList(),
+                selectedGenreId = null,
+                selectedGenreLabel = "All"
+            )
+        }
+        applyGenreFilterUpdate()
+    }
+
+    private fun applyGenreFilterUpdate() {
         if (!tmdbRepository.hasConfiguredApiKey() || !_browseUiState.value.isLiveTmdb) {
             refreshOfflineFilteredBrowse()
             return
         }
 
-        if (genreId == null && _browseUiState.value.discoverSort == DiscoverSort.POPULARITY) {
-            selectTmdbSection(_browseUiState.value.selectedSection)
+        if (_browseQuery.value.isNotBlank()) {
+            triggerSearch(_browseQuery.value)
+            return
+        }
+
+        val state = _browseUiState.value
+        if (state.selectedGenres.isEmpty() && state.discoverSort == DiscoverSort.POPULARITY) {
+            selectTmdbSection(state.selectedSection)
             return
         }
 
@@ -789,8 +862,27 @@ class VaultViewModel(
 
     fun selectDiscoverSort(sort: DiscoverSort) {
         _browseUiState.update { it.copy(discoverSort = sort) }
-        if (!tmdbRepository.hasConfiguredApiKey() || !_browseUiState.value.isLiveTmdb) return
+        if (!tmdbRepository.hasConfiguredApiKey() || !_browseUiState.value.isLiveTmdb) {
+            refreshOfflineFilteredBrowse()
+            return
+        }
+        if (_browseQuery.value.isNotBlank()) {
+            _browseUiState.update { current ->
+                current.copy(sectionTitles = sortTitlesLocally(current.sectionTitles, sort))
+            }
+            return
+        }
         runDiscover()
+    }
+
+    fun selectBrowseViewMode(mode: CatalogViewMode) {
+        _browseUiState.update { it.copy(viewMode = mode) }
+    }
+
+    fun cycleBrowseViewMode() {
+        val modes = CatalogViewMode.entries
+        val next = modes[(_browseUiState.value.viewMode.ordinal + 1) % modes.size]
+        _browseUiState.update { it.copy(viewMode = next) }
     }
 
     private fun runDiscover() {
@@ -805,6 +897,7 @@ class VaultViewModel(
             tmdbRepository.discover(
                 mediaType = mediaType,
                 genreId = state.selectedGenreId,
+                genreIds = state.selectedGenreIds,
                 sort = state.discoverSort,
                 page = 1
             ).onSuccess { res ->
@@ -849,8 +942,8 @@ class VaultViewModel(
         if (trimmed.isEmpty()) {
             _browseUiState.update { it.copy(searchPeople = emptyList(), searchCollections = emptyList()) }
             val state = _browseUiState.value
-            if (state.selectedGenreId != null) {
-                selectGenre(state.selectedGenreId, state.selectedGenreLabel)
+            if (state.selectedGenres.isNotEmpty() || state.discoverSort != DiscoverSort.POPULARITY) {
+                runDiscover()
             } else {
                 selectTmdbSection(state.selectedSection)
             }
@@ -862,11 +955,18 @@ class VaultViewModel(
             _browseUiState.update { it.copy(isLoading = true, errorMessage = null) }
             val activeScope = _browseUiState.value.searchScope
             tmdbRepository.search(trimmed, activeScope, page = 1).onSuccess { bundle ->
-                _browseUiState.update { state ->
-                    state.copy(
+                val state = _browseUiState.value
+                val processedTitles = filterAndSortTitlesLocally(
+                    titles = bundle.titles,
+                    mediaFilter = _browseMediaFilter.value,
+                    selectedGenres = state.selectedGenres,
+                    sort = state.discoverSort
+                )
+                _browseUiState.update { current ->
+                    current.copy(
                         isLoading = false,
                         isLiveTmdb = true,
-                        sectionTitles = bundle.titles,
+                        sectionTitles = processedTitles,
                         searchPeople = bundle.people,
                         searchCollections = bundle.collections,
                         currentPage = bundle.page,
@@ -907,7 +1007,12 @@ class VaultViewModel(
                     _browseUiState.value.selectedSection
                 } else TmdbSection.TV_POPULAR
             }
-            selectTmdbSection(targetSection)
+            if (_browseUiState.value.selectedGenres.isNotEmpty() || _browseUiState.value.discoverSort != DiscoverSort.POPULARITY) {
+                _browseUiState.update { it.copy(selectedSection = targetSection) }
+                runDiscover()
+            } else {
+                selectTmdbSection(targetSection)
+            }
         }
     }
 
@@ -921,10 +1026,16 @@ class VaultViewModel(
             val query = _browseQuery.value.trim()
             if (query.isNotEmpty()) {
                 tmdbRepository.search(query, state.searchScope, page = nextPage).onSuccess { bundle ->
+                    val filteredBatch = filterAndSortTitlesLocally(
+                        titles = bundle.titles,
+                        mediaFilter = _browseMediaFilter.value,
+                        selectedGenres = state.selectedGenres,
+                        sort = state.discoverSort
+                    )
                     _browseUiState.update { current ->
                         current.copy(
                             isLoadingMore = false,
-                            sectionTitles = (current.sectionTitles + bundle.titles).distinctBy { it.id },
+                            sectionTitles = (current.sectionTitles + filteredBatch).distinctBy { it.id },
                             searchPeople = (current.searchPeople + bundle.people).distinctBy { it.id },
                             searchCollections = (current.searchCollections + bundle.collections).distinctBy { it.id },
                             currentPage = bundle.page,
@@ -938,7 +1049,7 @@ class VaultViewModel(
                 return@launch
             }
 
-            val result = if (state.selectedGenreId != null || state.discoverSort != DiscoverSort.POPULARITY) {
+            val result = if (state.selectedGenreIds.isNotEmpty() || state.selectedGenreId != null || state.discoverSort != DiscoverSort.POPULARITY) {
                 val mediaType = when (_browseMediaFilter.value) {
                     MediaFilter.SERIES -> MediaType.SERIES
                     else -> state.selectedSection.mediaHint ?: MediaType.MOVIE
@@ -946,6 +1057,7 @@ class VaultViewModel(
                 tmdbRepository.discover(
                     mediaType = mediaType,
                     genreId = state.selectedGenreId,
+                    genreIds = state.selectedGenreIds,
                     sort = state.discoverSort,
                     page = nextPage
                 )
@@ -972,29 +1084,59 @@ class VaultViewModel(
     private fun refreshOfflineFilteredBrowse() {
         val query = _browseQuery.value.trim().lowercase()
         val mediaFilter = _browseMediaFilter.value
-        val genre = _browseUiState.value.selectedGenreLabel
+        val state = _browseUiState.value
 
-        val filtered = localCatalogTitles.filter { item ->
+        val queryMatched = localCatalogTitles.filter { item ->
+            query.isEmpty() ||
+                item.title.lowercase().contains(query) ||
+                item.directorOrCreator.lowercase().contains(query) ||
+                item.genres.any { it.lowercase().contains(query) } ||
+                item.cast.any { it.actor.lowercase().contains(query) }
+        }
+        val finalTitles = filterAndSortTitlesLocally(
+            titles = queryMatched,
+            mediaFilter = mediaFilter,
+            selectedGenres = state.selectedGenres,
+            sort = state.discoverSort
+        )
+
+        _browseUiState.update { current ->
+            current.copy(
+                sectionTitles = finalTitles,
+                currentPage = 1,
+                totalPages = 1
+            )
+        }
+    }
+
+    private fun filterAndSortTitlesLocally(
+        titles: List<CatalogTitle>,
+        mediaFilter: MediaFilter,
+        selectedGenres: List<String>,
+        sort: DiscoverSort
+    ): List<CatalogTitle> {
+        val filtered = titles.filter { item ->
             val matchesMedia = when (mediaFilter) {
                 MediaFilter.ALL -> true
                 MediaFilter.MOVIES -> item.mediaType == MediaType.MOVIE
                 MediaFilter.SERIES -> item.mediaType == MediaType.SERIES
             }
-            val matchesGenre = genre == "All" || item.genres.any { it.equals(genre, ignoreCase = true) }
-            val matchesQuery = query.isEmpty() ||
-                item.title.lowercase().contains(query) ||
-                item.directorOrCreator.lowercase().contains(query) ||
-                item.genres.any { it.lowercase().contains(query) } ||
-                item.cast.any { it.actor.lowercase().contains(query) }
-            matchesMedia && matchesGenre && matchesQuery
+            val matchesGenres = selectedGenres.isEmpty() || selectedGenres.any { sel ->
+                item.genres.any { g -> g.equals(sel, ignoreCase = true) || g.contains(sel, ignoreCase = true) }
+            }
+            matchesMedia && matchesGenres
         }
+        return sortTitlesLocally(filtered, sort)
+    }
 
-        _browseUiState.update { state ->
-            state.copy(
-                sectionTitles = filtered,
-                currentPage = 1,
-                totalPages = 1
+    private fun sortTitlesLocally(titles: List<CatalogTitle>, sort: DiscoverSort): List<CatalogTitle> {
+        return when (sort) {
+            DiscoverSort.POPULARITY -> titles
+            DiscoverSort.TOP_RATED -> titles.sortedByDescending { it.criticScore }
+            DiscoverSort.NEWEST -> titles.sortedWith(
+                compareByDescending<CatalogTitle> { it.releaseYear }.thenByDescending { it.releaseDate }
             )
+            DiscoverSort.MOST_VOTED -> titles.sortedByDescending { it.voteCount }
         }
     }
 
@@ -1078,6 +1220,16 @@ class VaultViewModel(
 
     fun updateWatchlistSort(sort: WatchlistSort) {
         _watchlistSort.value = sort
+    }
+
+    fun selectWatchlistViewMode(mode: CatalogViewMode) {
+        _watchlistViewMode.value = mode
+    }
+
+    fun cycleWatchlistViewMode() {
+        val modes = CatalogViewMode.entries
+        val next = modes[(_watchlistViewMode.value.ordinal + 1) % modes.size]
+        _watchlistViewMode.value = next
     }
 
     fun updateWatchedSearchQuery(query: String) {

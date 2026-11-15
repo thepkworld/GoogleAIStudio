@@ -106,6 +106,12 @@ enum class SearchScope(val label: String) {
     COLLECTIONS("Collections")
 }
 
+enum class CatalogViewMode(val label: String) {
+    GRID("Grid"),
+    LIST("List"),
+    COMPACT("Compact")
+}
+
 enum class OttPlatform(val label: String, val providerIds: String, val region: String) {
     ALL("All OTT", "8|119|337|350|1899", "US"),
     NETFLIX("Netflix", "8", "US"),

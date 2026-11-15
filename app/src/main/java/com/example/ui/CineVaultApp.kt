@@ -33,7 +33,6 @@ import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.VideoLibrary
-import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.Home
@@ -41,11 +40,13 @@ import androidx.compose.material.icons.rounded.MovieFilter
 import androidx.compose.material.icons.rounded.RateReview
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.VideoLibrary
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -66,6 +67,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -99,7 +101,6 @@ import com.example.data.repository.VaultRepository
 import com.example.data.tmdb.TmdbRepository
 import com.example.ui.components.MarkSeenDialog
 import com.example.ui.components.UnreleasedTitleDialog
-import com.example.ui.screens.AddCustomTitleSheet
 import com.example.ui.screens.BrowseScreen
 import com.example.ui.screens.CollectionDetailScreen
 import com.example.ui.screens.HomeScreen
@@ -119,6 +120,7 @@ import com.example.ui.theme.CinemaGold
 import com.example.ui.theme.CinemaObsidian
 import com.example.ui.theme.CinemaSilver
 import com.example.ui.theme.CinemaSlate
+import com.example.ui.theme.CinemaSlateElevated
 import com.example.ui.theme.CinemaVelvet
 import kotlin.math.roundToInt
 
@@ -174,7 +176,8 @@ fun CineVaultApp() {
 
     val navController = rememberNavController()
     var selectedTab by rememberSaveable { mutableStateOf(VaultTab.HOME) }
-    var showAddCustomSheet by remember { mutableStateOf(false) }
+    var searchRetapTrigger by remember { mutableIntStateOf(0) }
+    var searchFilterMenuTrigger by remember { mutableIntStateOf(0) }
     var showSeasonSheet by remember { mutableStateOf(false) }
     var pendingMarkSeen by remember { mutableStateOf<PendingMarkSeen?>(null) }
     var pendingUnreleased by remember { mutableStateOf<PendingUnreleased?>(null) }
@@ -193,6 +196,7 @@ fun CineVaultApp() {
     val watchlistEntries by vaultViewModel.watchlistEntries.collectAsStateWithLifecycle()
     val watchlistFilter by vaultViewModel.watchlistFilter.collectAsStateWithLifecycle()
     val watchlistSort by vaultViewModel.watchlistSort.collectAsStateWithLifecycle()
+    val watchlistViewMode by vaultViewModel.watchlistViewMode.collectAsStateWithLifecycle()
 
     val watchedEntries by vaultViewModel.watchedEntries.collectAsStateWithLifecycle()
     val watchedSearchQuery by vaultViewModel.watchedSearchQuery.collectAsStateWithLifecycle()
@@ -255,7 +259,13 @@ fun CineVaultApp() {
                                 }
                                 NavigationRailItem(
                                     selected = selected,
-                                    onClick = { selectedTab = tab },
+                                    onClick = {
+                                        if (selectedTab == VaultTab.SEARCH && tab == VaultTab.SEARCH) {
+                                            searchRetapTrigger++
+                                        } else {
+                                            selectedTab = tab
+                                        }
+                                    },
                                     icon = {
                                         TabIconWithBadge(
                                             icon = if (selected) tab.selectedIcon else tab.unselectedIcon,
@@ -350,19 +360,30 @@ fun CineVaultApp() {
                             )
                         },
                         floatingActionButton = {
-                            if (selectedTab != VaultTab.STATS) {
-                                FloatingActionButton(
-                                    onClick = { showAddCustomSheet = true },
-                                    containerColor = CinemaGold,
-                                    contentColor = CinemaObsidian,
-                                    shape = RoundedCornerShape(16.dp),
-                                    modifier = Modifier.testTag("fab_add_title")
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Add,
-                                        contentDescription = stringResource(id = R.string.add_custom_title)
-                                    )
-                                }
+                            if (selectedTab == VaultTab.SEARCH) {
+                                ExtendedFloatingActionButton(
+                                    onClick = { searchFilterMenuTrigger++ },
+                                    icon = {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Tune,
+                                            contentDescription = null
+                                        )
+                                    },
+                                    text = {
+                                        val activeCount = browseUiState.selectedGenres.size +
+                                            if (browseUiState.discoverSort != com.example.data.model.DiscoverSort.POPULARITY) 1 else 0
+                                        Text(
+                                            text = if (activeCount > 0) "Genre + Sort ($activeCount)" else "Genre + Sort",
+                                            style = MaterialTheme.typography.labelLarge,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    },
+                                    containerColor = CinemaSlateElevated,
+                                    contentColor = CinemaGold,
+                                    shape = CircleShape,
+                                    elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp),
+                                    modifier = Modifier.testTag("fab_genre_sort")
+                                )
                             }
                         },
                         bottomBar = {
@@ -381,7 +402,13 @@ fun CineVaultApp() {
                                         }
                                         NavigationBarItem(
                                             selected = selected,
-                                            onClick = { selectedTab = tab },
+                                            onClick = {
+                                                if (selectedTab == VaultTab.SEARCH && tab == VaultTab.SEARCH) {
+                                                    searchRetapTrigger++
+                                                } else {
+                                                    selectedTab = tab
+                                                }
+                                            },
                                             icon = {
                                                 TabIconWithBadge(
                                                     icon = if (selected) tab.selectedIcon else tab.unselectedIcon,
@@ -461,18 +488,20 @@ fun CineVaultApp() {
                                     searchQuery = browseQuery,
                                     selectedMediaFilter = browseMediaFilter,
                                     vaultById = vaultById,
+                                    retapTrigger = searchRetapTrigger,
+                                    filterMenuTrigger = searchFilterMenuTrigger,
                                     onSearchQueryChange = vaultViewModel::updateBrowseQuery,
                                     onMediaFilterChange = vaultViewModel::updateBrowseMediaFilter,
-                                    onSectionSelect = vaultViewModel::selectTmdbSection,
-                                    onGenreSelect = vaultViewModel::selectGenre,
+                                    onGenreToggle = vaultViewModel::toggleBrowseGenre,
+                                    onClearGenres = vaultViewModel::clearBrowseGenres,
                                     onDiscoverSortSelect = vaultViewModel::selectDiscoverSort,
                                     onSearchScopeSelect = vaultViewModel::selectSearchScope,
+                                    onViewModeChange = vaultViewModel::selectBrowseViewMode,
                                     onLoadMore = vaultViewModel::loadNextPage,
                                     onRefreshTmdb = vaultViewModel::refreshTmdbFeeds,
                                     onTitleClick = { id -> navController.navigate("detail/$id") },
                                     onPersonClick = { pid -> navController.navigate("person/$pid") },
-                                    onCollectionClick = { cid -> navController.navigate("collection/$cid") },
-                                    onAddCustomClick = { showAddCustomSheet = true }
+                                    onCollectionClick = { cid -> navController.navigate("collection/$cid") }
                                 )
 
                                 VaultTab.BUCKET_LIST -> WatchlistScreen(
@@ -480,10 +509,27 @@ fun CineVaultApp() {
                                     stats = vaultStats,
                                     selectedFilter = watchlistFilter,
                                     selectedSort = watchlistSort,
+                                    viewMode = watchlistViewMode,
                                     onFilterChange = vaultViewModel::updateWatchlistFilter,
                                     onSortChange = vaultViewModel::updateWatchlistSort,
+                                    onViewModeChange = vaultViewModel::selectWatchlistViewMode,
                                     onEntryClick = { id -> navController.navigate("detail/$id") },
-                                    onTogglePriority = vaultViewModel::togglePriority,
+                                    onMarkWatched = { entry ->
+                                        if (!entry.isReleased) {
+                                            pendingUnreleased = PendingUnreleased(
+                                                title = entry.title,
+                                                releaseDate = entry.releaseDate,
+                                                releaseYear = entry.releaseYear.toInt(),
+                                                catalogTitle = vaultViewModel.resolveCatalogTitle(entry.catalogId),
+                                                existingEntry = entry
+                                            )
+                                        } else {
+                                            pendingMarkSeen = PendingMarkSeen(
+                                                catalogTitle = vaultViewModel.resolveCatalogTitle(entry.catalogId),
+                                                existingEntry = entry
+                                            )
+                                        }
+                                    },
                                     onBrowseClick = { selectedTab = VaultTab.HOME }
                                 )
 
@@ -749,36 +795,6 @@ fun CineVaultApp() {
             onDismiss = {
                 showSeasonSheet = false
                 vaultViewModel.clearSeasonDetail()
-            }
-        )
-    }
-
-    if (showAddCustomSheet) {
-        AddCustomTitleSheet(
-            isMutating = isMutating,
-            onDismiss = { showAddCustomSheet = false },
-            onSubmit = { title, mediaType, status, year, genres, director, runtime, synopsis, posterKey, totalEp ->
-                vaultViewModel.createCustomTitle(
-                    title = title,
-                    mediaType = mediaType,
-                    status = status,
-                    releaseYear = year,
-                    genres = genres,
-                    directorOrCreator = director,
-                    runtimeOrSeasons = runtime,
-                    synopsis = synopsis,
-                    posterKey = posterKey,
-                    totalEpisodes = totalEp,
-                    userRating = 0.0,
-                    reviewTitle = "",
-                    reviewBody = "",
-                    favoriteQuote = "",
-                    isPriority = status == WatchStatus.WANT_TO_WATCH,
-                    onCreated = { newId ->
-                        showAddCustomSheet = false
-                        navController.navigate("detail/$newId")
-                    }
-                )
             }
         )
     }
