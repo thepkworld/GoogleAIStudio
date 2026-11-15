@@ -69,15 +69,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.data.model.MediaType
 import com.example.data.model.RatingScale
-import com.example.ui.theme.CinemaAlabaster
-import com.example.ui.theme.CinemaBorderSubtle
-import com.example.ui.theme.CinemaCrimson
-import com.example.ui.theme.CinemaEmerald
-import com.example.ui.theme.CinemaGold
-import com.example.ui.theme.CinemaObsidian
-import com.example.ui.theme.CinemaSilver
-import com.example.ui.theme.CinemaSlate
-import com.example.ui.theme.CinemaSlateElevated
+import com.example.ui.theme.CinemaTheme
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -90,13 +82,14 @@ fun TenStarRatingBar(
     onStarSelected: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = CinemaTheme.colors
     val label = RatingScale.labelFor(selectedStars)
     val badgeColor = when {
-        selectedStars >= 9 -> CinemaGold
-        selectedStars >= 7 -> CinemaEmerald
-        selectedStars >= 5 -> CinemaAlabaster
-        selectedStars >= 1 -> CinemaCrimson
-        else -> CinemaSilver
+        selectedStars >= 9 -> colors.gold
+        selectedStars >= 7 -> colors.emerald
+        selectedStars >= 5 -> colors.alabaster
+        selectedStars >= 1 -> colors.crimson
+        else -> colors.silver
     }
 
     Column(
@@ -124,14 +117,14 @@ fun TenStarRatingBar(
                     Icon(
                         imageVector = if (filled) Icons.Rounded.Star else Icons.Rounded.StarBorder,
                         contentDescription = null,
-                        tint = if (filled) CinemaGold else CinemaSilver.copy(alpha = 0.55f),
+                        tint = if (filled) colors.gold else colors.silver.copy(alpha = 0.55f),
                         modifier = Modifier.size(22.dp)
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = "$star",
                         style = MaterialTheme.typography.labelSmall,
-                        color = if (filled) CinemaGold else CinemaSilver.copy(alpha = 0.7f),
+                        color = if (filled) colors.gold else colors.silver.copy(alpha = 0.7f),
                         fontWeight = if (filled) FontWeight.Bold else FontWeight.Normal,
                         textAlign = TextAlign.Center
                     )
@@ -182,6 +175,7 @@ fun MarkSeenDialog(
     onDismiss: () -> Unit,
     onConfirm: (rating: Int, reviewHeadline: String, watchedAtMillis: Long) -> Unit
 ) {
+    val colors = CinemaTheme.colors
     var selectedStars by remember(title) { mutableIntStateOf(initialRating.coerceIn(0, 10)) }
     var reviewHeadline by remember(title) { mutableStateOf(initialHeadline) }
     var watchedAtMillis by remember(title) {
@@ -198,9 +192,9 @@ fun MarkSeenDialog(
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Surface(
-            color = CinemaSlate,
+            color = colors.slate,
             shape = RoundedCornerShape(24.dp),
-            border = BorderStroke(1.dp, CinemaGold.copy(alpha = 0.35f)),
+            border = BorderStroke(1.dp, colors.gold.copy(alpha = 0.35f)),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
@@ -221,13 +215,13 @@ fun MarkSeenDialog(
                         modifier = Modifier
                             .size(40.dp)
                             .clip(RoundedCornerShape(12.dp))
-                            .background(CinemaEmerald.copy(alpha = 0.16f)),
+                            .background(colors.emerald.copy(alpha = 0.16f)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.CheckCircle,
                             contentDescription = null,
-                            tint = CinemaEmerald,
+                            tint = colors.emerald,
                             modifier = Modifier.size(22.dp)
                         )
                     }
@@ -235,31 +229,31 @@ fun MarkSeenDialog(
                         Text(
                             text = "MARK AS SEEN",
                             style = MaterialTheme.typography.labelSmall,
-                            color = CinemaEmerald,
+                            color = colors.emerald,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
                             text = title,
                             style = MaterialTheme.typography.titleLarge,
-                            color = CinemaAlabaster,
+                            color = colors.alabaster,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = "$releaseYear · ${mediaType.label}",
                             style = MaterialTheme.typography.bodySmall,
-                            color = CinemaSilver
+                            color = colors.silver
                         )
                     }
                 }
 
-                HorizontalDivider(color = CinemaBorderSubtle)
+                HorizontalDivider(color = colors.borderSubtle)
 
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
                         text = "Your Rating (1–10)",
                         style = MaterialTheme.typography.titleSmall,
-                        color = CinemaAlabaster
+                        color = colors.alabaster
                     )
                     TenStarRatingBar(
                         selectedStars = selectedStars,
@@ -275,13 +269,13 @@ fun MarkSeenDialog(
                     singleLine = true,
                     shape = RoundedCornerShape(14.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = CinemaGold,
-                        unfocusedBorderColor = CinemaBorderSubtle,
-                        focusedLabelColor = CinemaGold,
-                        unfocusedLabelColor = CinemaSilver,
-                        focusedTextColor = CinemaAlabaster,
-                        unfocusedTextColor = CinemaAlabaster,
-                        cursorColor = CinemaGold
+                        focusedBorderColor = colors.gold,
+                        unfocusedBorderColor = colors.borderSubtle,
+                        focusedLabelColor = colors.gold,
+                        unfocusedLabelColor = colors.silver,
+                        focusedTextColor = colors.alabaster,
+                        unfocusedTextColor = colors.alabaster,
+                        cursorColor = colors.gold
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -297,12 +291,12 @@ fun MarkSeenDialog(
                         Text(
                             text = "Watched Date",
                             style = MaterialTheme.typography.titleSmall,
-                            color = CinemaAlabaster
+                            color = colors.alabaster
                         )
                         Text(
                             text = formatWatchedDate(watchedAtMillis),
                             style = MaterialTheme.typography.labelLarge,
-                            color = CinemaGold,
+                            color = colors.gold,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -315,12 +309,12 @@ fun MarkSeenDialog(
                             onClick = { watchedAtMillis = todayLocalNoonMillis() },
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isTodaySelected) CinemaGold else CinemaSlateElevated,
-                                contentColor = if (isTodaySelected) CinemaObsidian else CinemaAlabaster
+                                containerColor = if (isTodaySelected) colors.gold else colors.slateElevated,
+                                contentColor = if (isTodaySelected) colors.onGold else colors.alabaster
                             ),
                             border = BorderStroke(
                                 1.dp,
-                                if (isTodaySelected) CinemaGold else CinemaBorderSubtle
+                                if (isTodaySelected) colors.gold else colors.borderSubtle
                             ),
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
                             modifier = Modifier
@@ -346,11 +340,11 @@ fun MarkSeenDialog(
                             shape = RoundedCornerShape(12.dp),
                             border = BorderStroke(
                                 1.dp,
-                                if (!isTodaySelected) CinemaGold else CinemaBorderSubtle
+                                if (!isTodaySelected) colors.gold else colors.borderSubtle
                             ),
                             colors = ButtonDefaults.outlinedButtonColors(
-                                containerColor = if (!isTodaySelected) CinemaGold.copy(alpha = 0.16f) else CinemaSlateElevated,
-                                contentColor = if (!isTodaySelected) CinemaGold else CinemaAlabaster
+                                containerColor = if (!isTodaySelected) colors.gold.copy(alpha = 0.16f) else colors.slateElevated,
+                                contentColor = if (!isTodaySelected) colors.gold else colors.alabaster
                             ),
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
                             modifier = Modifier
@@ -383,12 +377,12 @@ fun MarkSeenDialog(
                         onClick = onDismiss,
                         enabled = !isSaving,
                         shape = RoundedCornerShape(14.dp),
-                        border = BorderStroke(1.dp, CinemaBorderSubtle),
+                        border = BorderStroke(1.dp, colors.borderSubtle),
                         modifier = Modifier
                             .weight(1f)
                             .height(50.dp)
                     ) {
-                        Text("Cancel", color = CinemaSilver)
+                        Text("Cancel", color = colors.silver)
                     }
 
                     Button(
@@ -396,8 +390,8 @@ fun MarkSeenDialog(
                         enabled = !isSaving,
                         shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = CinemaEmerald,
-                            contentColor = CinemaObsidian
+                            containerColor = colors.emerald,
+                            contentColor = MaterialTheme.colorScheme.onTertiary
                         ),
                         modifier = Modifier
                             .weight(1.4f)
@@ -440,6 +434,7 @@ fun WatchedDatePickerDialog(
     onDismiss: () -> Unit,
     onDateSelected: (Long) -> Unit
 ) {
+    val colors = CinemaTheme.colors
     val todayUtcMillis = remember { localMillisToUtcDatePickerMillis(todayLocalNoonMillis()) }
     val datePickerState = rememberDatePickerState(
         initialSelectedDateMillis = localMillisToUtcDatePickerMillis(initialLocalMillis),
@@ -452,7 +447,7 @@ fun WatchedDatePickerDialog(
 
     DatePickerDialog(
         onDismissRequest = onDismiss,
-        colors = DatePickerDefaults.colors(containerColor = CinemaSlate),
+        colors = DatePickerDefaults.colors(containerColor = colors.slate),
         confirmButton = {
             TextButton(
                 onClick = {
@@ -464,32 +459,32 @@ fun WatchedDatePickerDialog(
                     }
                 }
             ) {
-                Text("Select", color = CinemaGold, fontWeight = FontWeight.Bold)
+                Text("Select", color = colors.gold, fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel", color = CinemaSilver)
+                Text("Cancel", color = colors.silver)
             }
         }
     ) {
         DatePicker(
             state = datePickerState,
             colors = DatePickerDefaults.colors(
-                containerColor = CinemaSlate,
-                titleContentColor = CinemaAlabaster,
-                headlineContentColor = CinemaGold,
-                weekdayContentColor = CinemaSilver,
-                subheadContentColor = CinemaSilver,
-                yearContentColor = CinemaAlabaster,
-                currentYearContentColor = CinemaGold,
-                selectedYearContentColor = CinemaObsidian,
-                selectedYearContainerColor = CinemaGold,
-                dayContentColor = CinemaAlabaster,
-                selectedDayContentColor = CinemaObsidian,
-                selectedDayContainerColor = CinemaGold,
-                todayContentColor = CinemaGold,
-                todayDateBorderColor = CinemaGold
+                containerColor = colors.slate,
+                titleContentColor = colors.alabaster,
+                headlineContentColor = colors.gold,
+                weekdayContentColor = colors.silver,
+                subheadContentColor = colors.silver,
+                yearContentColor = colors.alabaster,
+                currentYearContentColor = colors.gold,
+                selectedYearContentColor = colors.onGold,
+                selectedYearContainerColor = colors.gold,
+                dayContentColor = colors.alabaster,
+                selectedDayContentColor = colors.onGold,
+                selectedDayContainerColor = colors.gold,
+                todayContentColor = colors.gold,
+                todayDateBorderColor = colors.gold
             )
         )
     }
@@ -564,6 +559,7 @@ fun UnreleasedTitleDialog(
     onDismiss: () -> Unit,
     onAddToBucketlist: () -> Unit
 ) {
+    val colors = CinemaTheme.colors
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { visible = true }
     val scale by animateFloatAsState(
@@ -585,9 +581,9 @@ fun UnreleasedTitleDialog(
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Surface(
-            color = CinemaSlate,
+            color = colors.slate,
             shape = RoundedCornerShape(24.dp),
-            border = BorderStroke(1.dp, CinemaGold.copy(alpha = 0.45f)),
+            border = BorderStroke(1.dp, colors.gold.copy(alpha = 0.45f)),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp)
@@ -609,13 +605,13 @@ fun UnreleasedTitleDialog(
                     modifier = Modifier
                         .size(56.dp)
                         .clip(RoundedCornerShape(16.dp))
-                        .background(CinemaGold.copy(alpha = 0.16f)),
+                        .background(colors.gold.copy(alpha = 0.16f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.Schedule,
                         contentDescription = null,
-                        tint = CinemaGold,
+                        tint = colors.gold,
                         modifier = Modifier.size(30.dp)
                     )
                 }
@@ -623,7 +619,7 @@ fun UnreleasedTitleDialog(
                 Text(
                     text = "This movie isn’t released yet.",
                     style = MaterialTheme.typography.headlineSmall,
-                    color = CinemaAlabaster,
+                    color = colors.alabaster,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center
                 )
@@ -636,7 +632,7 @@ fun UnreleasedTitleDialog(
                 Text(
                     text = "\"$title\" is $releaseInfo. You can save it to your Bucketlist now and mark it as watched once it releases.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = CinemaSilver,
+                    color = colors.silver,
                     textAlign = TextAlign.Center
                 )
 
@@ -649,13 +645,13 @@ fun UnreleasedTitleDialog(
                     OutlinedButton(
                         onClick = onDismiss,
                         shape = RoundedCornerShape(14.dp),
-                        border = BorderStroke(1.dp, CinemaBorderSubtle),
+                        border = BorderStroke(1.dp, colors.borderSubtle),
                         modifier = Modifier
                             .weight(1f)
                             .height(48.dp)
                             .testTag("unreleased_dismiss_button")
                     ) {
-                        Text("Got It", color = CinemaAlabaster, fontWeight = FontWeight.SemiBold)
+                        Text("Got It", color = colors.alabaster, fontWeight = FontWeight.SemiBold)
                     }
 
                     if (!alreadyInBucketlist) {
@@ -663,8 +659,8 @@ fun UnreleasedTitleDialog(
                             onClick = onAddToBucketlist,
                             shape = RoundedCornerShape(14.dp),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = CinemaGold,
-                                contentColor = CinemaObsidian
+                                containerColor = colors.gold,
+                                contentColor = colors.onGold
                             ),
                             modifier = Modifier
                                 .weight(1.3f)

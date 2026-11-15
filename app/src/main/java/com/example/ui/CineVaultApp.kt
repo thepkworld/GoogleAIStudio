@@ -1,5 +1,10 @@
 package com.example.ui
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -35,15 +40,21 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.VideoLibrary
 import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.Bookmark
+import androidx.compose.material.icons.rounded.CloudSync
 import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.MovieFilter
 import androidx.compose.material.icons.rounded.RateReview
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.VideoLibrary
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
@@ -62,14 +73,17 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -77,11 +91,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -93,17 +109,24 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.R
+import com.example.auth.AuthSessionManager
 import com.example.data.model.CatalogTitle
+import com.example.data.model.DiscoverSort
 import com.example.data.model.MediaType
 import com.example.data.model.VaultEntry
 import com.example.data.model.WatchStatus
+import com.example.data.omdb.OmdbRepository
+import com.example.data.preferences.AppPreferencesRepository
+import com.example.data.remote.VaultCloudRepository
 import com.example.data.repository.VaultRepository
 import com.example.data.tmdb.TmdbRepository
+import com.example.ui.components.CineVaultDrawerHost
 import com.example.ui.components.MarkSeenDialog
 import com.example.ui.components.UnreleasedTitleDialog
 import com.example.ui.screens.BrowseScreen
 import com.example.ui.screens.CollectionDetailScreen
 import com.example.ui.screens.HomeScreen
+import com.example.ui.screens.OnboardingAuthScreen
 import com.example.ui.screens.PersonDetailScreen
 import com.example.ui.screens.ReviewsScreen
 import com.example.ui.screens.SeasonEpisodesSheet
@@ -112,16 +135,10 @@ import com.example.ui.screens.StatsScreen
 import com.example.ui.screens.TitleDetailScreen
 import com.example.ui.screens.WatchedScreen
 import com.example.ui.screens.WatchlistScreen
-import com.example.ui.theme.CinemaAlabaster
-import com.example.ui.theme.CinemaBorderSubtle
-import com.example.ui.theme.CinemaCrimsonContainer
-import com.example.ui.theme.CinemaEmerald
-import com.example.ui.theme.CinemaGold
-import com.example.ui.theme.CinemaObsidian
-import com.example.ui.theme.CinemaSilver
-import com.example.ui.theme.CinemaSlate
-import com.example.ui.theme.CinemaSlateElevated
-import com.example.ui.theme.CinemaVelvet
+import com.example.ui.theme.CinemaTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 private enum class VaultTab(
@@ -157,25 +174,82 @@ private const val ROUTE_COLLECTION = "collection/{collectionId}"
 private const val ROUTE_REVIEWS = "reviews"
 private const val ROUTE_SECTION = "section"
 
+fun defaultCineVaultViewModelFactory(): ViewModelProvider.Factory = viewModelFactory {
+    initializer {
+        val app = checkNotNull(this[APPLICATION_KEY]) {
+            "APPLICATION_KEY missing from CreationExtras"
+        }
+        VaultViewModel(
+            repository = VaultRepository(app),
+            tmdbRepository = TmdbRepository(),
+            omdbRepository = OmdbRepository(),
+            cloudRepository = VaultCloudRepository(app),
+            preferencesRepository = AppPreferencesRepository(app),
+            authSessionManager = AuthSessionManager()
+        )
+    }
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CineVaultApp() {
-    val vaultViewModel: VaultViewModel = viewModel(
-        factory = viewModelFactory {
-            initializer {
-                val app = checkNotNull(this[APPLICATION_KEY]) {
-                    "APPLICATION_KEY missing from CreationExtras"
-                }
-                VaultViewModel(
-                    repository = VaultRepository(app),
-                    tmdbRepository = TmdbRepository()
-                )
-            }
+fun CineVaultApp(
+    vaultViewModel: VaultViewModel = viewModel(factory = defaultCineVaultViewModelFactory())
+) {
+    val colors = CinemaTheme.colors
+    val context = LocalContext.current
+    val activityContext = remember(context) { context.findActivity() ?: context }
+    val coroutineScope = rememberCoroutineScope()
+
+    val preferencesLoaded by vaultViewModel.preferencesLoaded.collectAsStateWithLifecycle()
+    val preferencesState by vaultViewModel.preferencesState.collectAsStateWithLifecycle()
+    val authUser by vaultViewModel.authUser.collectAsStateWithLifecycle()
+    val isAuthBusy by vaultViewModel.isAuthBusy.collectAsStateWithLifecycle()
+    val authErrorMessage by vaultViewModel.authErrorMessage.collectAsStateWithLifecycle()
+    val isSyncingCloud by vaultViewModel.isSyncingCloud.collectAsStateWithLifecycle()
+    val pendingGuestMergeCount by vaultViewModel.pendingGuestMergeCount.collectAsStateWithLifecycle()
+    val apiConnectionStatus by vaultViewModel.apiConnectionStatus.collectAsStateWithLifecycle()
+
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(vaultViewModel) {
+        vaultViewModel.snackbarEvents.collect { message ->
+            snackbarHostState.showSnackbar(message)
         }
-    )
+    }
+
+    if (!preferencesLoaded) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(colors.obsidian),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator(color = colors.gold)
+        }
+        return
+    }
+
+    if (!preferencesState.hasCompletedOnboarding && authUser == null) {
+        OnboardingAuthScreen(
+            isBusy = isAuthBusy,
+            errorMessage = authErrorMessage,
+            onSignUpClick = { vaultViewModel.signInWithGoogle(activityContext, isSignUp = true) },
+            onSignInClick = { vaultViewModel.signInWithGoogle(activityContext, isSignUp = false) },
+            onContinueGuestClick = { vaultViewModel.continueAsGuest() },
+            onDismissError = { vaultViewModel.clearAuthError() }
+        )
+        return
+    }
 
     val navController = rememberNavController()
     var selectedTab by rememberSaveable { mutableStateOf(VaultTab.HOME) }
+    var isDrawerOpen by rememberSaveable { mutableStateOf(false) }
     var searchRetapTrigger by remember { mutableIntStateOf(0) }
     var searchFilterMenuTrigger by remember { mutableIntStateOf(0) }
     var showSeasonSheet by remember { mutableStateOf(false) }
@@ -183,7 +257,6 @@ fun CineVaultApp() {
     var pendingUnreleased by remember { mutableStateOf<PendingUnreleased?>(null) }
     var activeSectionTitle by remember { mutableStateOf("") }
     var activeSectionItems by remember { mutableStateOf<List<CatalogTitle>>(emptyList()) }
-    val snackbarHostState = remember { SnackbarHostState() }
 
     val vaultState by vaultViewModel.vaultEntriesState.collectAsStateWithLifecycle()
     val vaultById by vaultViewModel.vaultById.collectAsStateWithLifecycle()
@@ -223,9 +296,50 @@ fun CineVaultApp() {
     val seasonDetail by vaultViewModel.seasonDetail.collectAsStateWithLifecycle()
     val isLoadingSeason by vaultViewModel.isLoadingSeason.collectAsStateWithLifecycle()
 
-    LaunchedEffect(vaultViewModel) {
-        vaultViewModel.snackbarEvents.collect { message ->
-            snackbarHostState.showSnackbar(message)
+    val exportJsonLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        coroutineScope.launch {
+            vaultViewModel.exportVaultJson()
+                .onSuccess { jsonPayload ->
+                    val writeResult = withContext(Dispatchers.IO) {
+                        runCatching {
+                            context.contentResolver.openOutputStream(uri)?.use { stream ->
+                                stream.write(jsonPayload.toByteArray(Charsets.UTF_8))
+                                stream.flush()
+                            } ?: error("Could not open file for writing.")
+                        }
+                    }
+                    writeResult
+                        .onSuccess { snackbarHostState.showSnackbar("Vault & stats exported as JSON") }
+                        .onFailure { err ->
+                            snackbarHostState.showSnackbar(err.localizedMessage ?: "Export failed")
+                        }
+                }
+                .onFailure { err ->
+                    snackbarHostState.showSnackbar(err.localizedMessage ?: "Could not prepare export")
+                }
+        }
+    }
+
+    val importJsonLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        coroutineScope.launch {
+            val readResult = withContext(Dispatchers.IO) {
+                runCatching {
+                    context.contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use {
+                        it.readText()
+                    } ?: error("Could not read selected file.")
+                }
+            }
+            readResult
+                .onSuccess { rawJson -> vaultViewModel.importVaultJson(rawJson) }
+                .onFailure { err ->
+                    snackbarHostState.showSnackbar(err.localizedMessage ?: "Failed to read backup file")
+                }
         }
     }
 
@@ -234,332 +348,376 @@ fun CineVaultApp() {
         startDestination = ROUTE_MAIN
     ) {
         composable(ROUTE_MAIN) {
-            BoxWithConstraints(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(CinemaObsidian)
+            CineVaultDrawerHost(
+                isOpen = isDrawerOpen,
+                onClose = { isDrawerOpen = false },
+                authUser = authUser,
+                isAuthBusy = isAuthBusy,
+                isSyncingCloud = isSyncingCloud,
+                pendingGuestMergeCount = pendingGuestMergeCount,
+                isDarkTheme = preferencesState.isDarkTheme,
+                apiStatus = apiConnectionStatus,
+                totalWatched = vaultStats.totalWatched,
+                totalBucketlist = vaultStats.totalWatchlist,
+                onSignInClick = {
+                    isDrawerOpen = false
+                    vaultViewModel.signInWithGoogle(activityContext, isSignUp = false)
+                },
+                onSignOutClick = {
+                    isDrawerOpen = false
+                    vaultViewModel.signOut(activityContext)
+                },
+                onSyncLocalClick = { vaultViewModel.syncLocalVaultToCloud() },
+                onToggleTheme = { enabled -> vaultViewModel.setDarkTheme(enabled) },
+                onRefreshFeeds = { vaultViewModel.refreshTmdbFeeds() },
+                onExportJsonClick = {
+                    exportJsonLauncher.launch("cinemapaglu_vault_backup.json")
+                },
+                onImportJsonClick = {
+                    importJsonLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
+                }
             ) {
-                val useNavigationRail = maxWidth >= 700.dp
+                BoxWithConstraints(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(colors.obsidian)
+                ) {
+                    val useNavigationRail = maxWidth >= 700.dp
 
-                Row(modifier = Modifier.fillMaxSize()) {
-                    if (useNavigationRail) {
-                        NavigationRail(
-                            containerColor = CinemaVelvet,
-                            contentColor = CinemaAlabaster,
-                            modifier = Modifier
-                                .fillMaxHeight()
-                                .windowInsetsPadding(WindowInsets.safeDrawing)
-                        ) {
-                            Spacer(modifier = Modifier.size(12.dp))
-                            VaultTab.entries.forEach { tab ->
-                                val selected = selectedTab == tab
-                                val countBadge = when (tab) {
-                                    VaultTab.BUCKET_LIST -> vaultStats.totalWatchlist
-                                    VaultTab.LIBRARY -> vaultStats.totalWatched
-                                    else -> 0
-                                }
-                                NavigationRailItem(
-                                    selected = selected,
-                                    onClick = {
-                                        if (selectedTab == VaultTab.SEARCH && tab == VaultTab.SEARCH) {
-                                            searchRetapTrigger++
-                                        } else {
-                                            selectedTab = tab
-                                        }
-                                    },
-                                    icon = {
-                                        TabIconWithBadge(
-                                            icon = if (selected) tab.selectedIcon else tab.unselectedIcon,
-                                            contentDescription = tab.title,
-                                            countBadge = countBadge
-                                        )
-                                    },
-                                    label = { Text(tab.title) },
-                                    colors = NavigationRailItemDefaults.colors(
-                                        selectedIconColor = CinemaObsidian,
-                                        selectedTextColor = CinemaGold,
-                                        indicatorColor = CinemaGold,
-                                        unselectedIconColor = CinemaSilver,
-                                        unselectedTextColor = CinemaSilver
-                                    ),
-                                    modifier = Modifier.testTag(tab.tag)
-                                )
-                            }
-                        }
-                    }
-
-                    Scaffold(
-                        containerColor = CinemaObsidian,
-                        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-                        snackbarHost = {
-                            SnackbarHost(hostState = snackbarHostState) { data ->
-                                Snackbar(
-                                    snackbarData = data,
-                                    containerColor = CinemaSlate,
-                                    contentColor = CinemaAlabaster,
-                                    actionColor = CinemaGold
-                                )
-                            }
-                        },
-                        topBar = {
-                            TopAppBar(
-                                colors = TopAppBarDefaults.topAppBarColors(
-                                    containerColor = CinemaObsidian,
-                                    titleContentColor = CinemaAlabaster
-                                ),
-                                title = {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(32.dp)
-                                                .clip(RoundedCornerShape(9.dp))
-                                                .background(CinemaGold.copy(alpha = 0.16f)),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Rounded.MovieFilter,
-                                                contentDescription = null,
-                                                tint = CinemaGold,
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                        }
-                                        Column {
-                                            Text(
-                                                text = stringResource(id = R.string.app_name),
-                                                style = MaterialTheme.typography.headlineMedium,
-                                                color = CinemaAlabaster
-                                            )
-                                            Text(
-                                                text = selectedTab.title.uppercase(),
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = CinemaGold
-                                            )
-                                        }
+                    Row(modifier = Modifier.fillMaxSize()) {
+                        if (useNavigationRail) {
+                            NavigationRail(
+                                containerColor = colors.velvet,
+                                contentColor = colors.alabaster,
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .windowInsetsPadding(WindowInsets.safeDrawing)
+                            ) {
+                                Spacer(modifier = Modifier.size(12.dp))
+                                VaultTab.entries.forEach { tab ->
+                                    val selected = selectedTab == tab
+                                    val countBadge = when (tab) {
+                                        VaultTab.BUCKET_LIST -> vaultStats.totalWatchlist
+                                        VaultTab.LIBRARY -> vaultStats.totalWatched
+                                        else -> 0
                                     }
-                                },
-                                actions = {
-                                    IconButton(
-                                        onClick = { navController.navigate(ROUTE_REVIEWS) },
-                                        modifier = Modifier.testTag("open_reviews_journal_button")
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.RateReview,
-                                            contentDescription = "Open Reviews Journal",
-                                            tint = CinemaGold
-                                        )
-                                    }
-
-                                    StatusLivePill(
-                                        isLive = browseUiState.isLiveTmdb || browseUiState.isLiveOmdb,
-                                        onClick = { vaultViewModel.refreshTmdbFeeds() },
-                                        modifier = Modifier.padding(end = 12.dp)
+                                    NavigationRailItem(
+                                        selected = selected,
+                                        onClick = {
+                                            if (selectedTab == VaultTab.SEARCH && tab == VaultTab.SEARCH) {
+                                                searchRetapTrigger++
+                                            } else {
+                                                selectedTab = tab
+                                            }
+                                        },
+                                        icon = {
+                                            TabIconWithBadge(
+                                                icon = if (selected) tab.selectedIcon else tab.unselectedIcon,
+                                                contentDescription = tab.title,
+                                                countBadge = countBadge
+                                            )
+                                        },
+                                        label = { Text(tab.title) },
+                                        colors = NavigationRailItemDefaults.colors(
+                                            selectedIconColor = colors.onGold,
+                                            selectedTextColor = colors.gold,
+                                            indicatorColor = colors.gold,
+                                            unselectedIconColor = colors.silver,
+                                            unselectedTextColor = colors.silver
+                                        ),
+                                        modifier = Modifier.testTag(tab.tag)
                                     )
                                 }
-                            )
-                        },
-                        floatingActionButton = {
-                            if (selectedTab == VaultTab.SEARCH) {
-                                ExtendedFloatingActionButton(
-                                    onClick = { searchFilterMenuTrigger++ },
-                                    icon = {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Tune,
-                                            contentDescription = null
-                                        )
-                                    },
-                                    text = {
-                                        val activeCount = browseUiState.selectedGenres.size +
-                                            if (browseUiState.discoverSort != com.example.data.model.DiscoverSort.POPULARITY) 1 else 0
-                                        Text(
-                                            text = if (activeCount > 0) "Genre + Sort ($activeCount)" else "Genre + Sort",
-                                            style = MaterialTheme.typography.labelLarge,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    },
-                                    containerColor = CinemaSlateElevated,
-                                    contentColor = CinemaGold,
-                                    shape = CircleShape,
-                                    elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp),
-                                    modifier = Modifier.testTag("fab_genre_sort")
-                                )
                             }
-                        },
-                        bottomBar = {
-                            if (!useNavigationRail) {
-                                NavigationBar(
-                                    containerColor = CinemaVelvet,
-                                    contentColor = CinemaAlabaster,
-                                    windowInsets = WindowInsets.navigationBars
-                                ) {
-                                    VaultTab.entries.forEach { tab ->
-                                        val selected = selectedTab == tab
-                                        val countBadge = when (tab) {
-                                            VaultTab.BUCKET_LIST -> vaultStats.totalWatchlist
-                                            VaultTab.LIBRARY -> vaultStats.totalWatched
-                                            else -> 0
+                        }
+
+                        Scaffold(
+                            containerColor = colors.obsidian,
+                            contentWindowInsets = WindowInsets(0, 0, 0, 0),
+                            snackbarHost = {
+                                SnackbarHost(hostState = snackbarHostState) { data ->
+                                    Snackbar(
+                                        snackbarData = data,
+                                        containerColor = colors.slate,
+                                        contentColor = colors.alabaster,
+                                        actionColor = colors.gold
+                                    )
+                                }
+                            },
+                            topBar = {
+                                TopAppBar(
+                                    colors = TopAppBarDefaults.topAppBarColors(
+                                        containerColor = colors.obsidian,
+                                        titleContentColor = colors.alabaster
+                                    ),
+                                    navigationIcon = {
+                                        IconButton(
+                                            onClick = { isDrawerOpen = true },
+                                            modifier = Modifier.testTag("drawer_menu_button")
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.Menu,
+                                                contentDescription = "Open navigation menu",
+                                                tint = colors.alabaster
+                                            )
                                         }
-                                        NavigationBarItem(
-                                            selected = selected,
-                                            onClick = {
-                                                if (selectedTab == VaultTab.SEARCH && tab == VaultTab.SEARCH) {
-                                                    searchRetapTrigger++
-                                                } else {
-                                                    selectedTab = tab
-                                                }
-                                            },
-                                            icon = {
-                                                TabIconWithBadge(
-                                                    icon = if (selected) tab.selectedIcon else tab.unselectedIcon,
-                                                    contentDescription = tab.title,
-                                                    countBadge = countBadge
+                                    },
+                                    title = {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(32.dp)
+                                                    .clip(RoundedCornerShape(9.dp))
+                                                    .background(colors.gold.copy(alpha = 0.16f)),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Rounded.MovieFilter,
+                                                    contentDescription = null,
+                                                    tint = colors.gold,
+                                                    modifier = Modifier.size(18.dp)
                                                 )
-                                            },
-                                            label = {
+                                            }
+                                            Column {
                                                 Text(
-                                                    text = tab.title,
+                                                    text = stringResource(id = R.string.app_name),
+                                                    style = MaterialTheme.typography.headlineMedium,
+                                                    color = colors.alabaster,
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
-                                            },
-                                            colors = NavigationBarItemDefaults.colors(
-                                                selectedIconColor = CinemaObsidian,
-                                                selectedTextColor = CinemaGold,
-                                                indicatorColor = CinemaGold,
-                                                unselectedIconColor = CinemaSilver,
-                                                unselectedTextColor = CinemaSilver
-                                            ),
-                                            modifier = Modifier.testTag(tab.tag)
+                                                Text(
+                                                    text = selectedTab.title.uppercase(),
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = colors.gold
+                                                )
+                                            }
+                                        }
+                                    },
+                                    actions = {
+                                        IconButton(
+                                            onClick = { navController.navigate(ROUTE_REVIEWS) },
+                                            modifier = Modifier.testTag("open_reviews_journal_button")
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.RateReview,
+                                                contentDescription = "Open Reviews Journal",
+                                                tint = colors.gold
+                                            )
+                                        }
+
+                                        StatusLivePill(
+                                            apiStatus = apiConnectionStatus,
+                                            onClick = { vaultViewModel.refreshTmdbFeeds() },
+                                            modifier = Modifier.padding(end = 12.dp)
                                         )
+                                    }
+                                )
+                            },
+                            floatingActionButton = {
+                                if (selectedTab == VaultTab.SEARCH) {
+                                    ExtendedFloatingActionButton(
+                                        onClick = { searchFilterMenuTrigger++ },
+                                        icon = {
+                                            Icon(
+                                                imageVector = Icons.Rounded.Tune,
+                                                contentDescription = null
+                                            )
+                                        },
+                                        text = {
+                                            val activeCount = browseUiState.selectedGenres.size +
+                                                if (browseUiState.discoverSort != DiscoverSort.POPULARITY) 1 else 0
+                                            Text(
+                                                text = if (activeCount > 0) "Genre + Sort ($activeCount)" else "Genre + Sort",
+                                                style = MaterialTheme.typography.labelLarge,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        },
+                                        containerColor = colors.slateElevated,
+                                        contentColor = colors.gold,
+                                        shape = CircleShape,
+                                        elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp),
+                                        modifier = Modifier.testTag("fab_genre_sort")
+                                    )
+                                }
+                            },
+                            bottomBar = {
+                                if (!useNavigationRail) {
+                                    NavigationBar(
+                                        containerColor = colors.velvet,
+                                        contentColor = colors.alabaster,
+                                        windowInsets = WindowInsets.navigationBars
+                                    ) {
+                                        VaultTab.entries.forEach { tab ->
+                                            val selected = selectedTab == tab
+                                            val countBadge = when (tab) {
+                                                VaultTab.BUCKET_LIST -> vaultStats.totalWatchlist
+                                                VaultTab.LIBRARY -> vaultStats.totalWatched
+                                                else -> 0
+                                            }
+                                            NavigationBarItem(
+                                                selected = selected,
+                                                onClick = {
+                                                    if (selectedTab == VaultTab.SEARCH && tab == VaultTab.SEARCH) {
+                                                        searchRetapTrigger++
+                                                    } else {
+                                                        selectedTab = tab
+                                                    }
+                                                },
+                                                icon = {
+                                                    TabIconWithBadge(
+                                                        icon = if (selected) tab.selectedIcon else tab.unselectedIcon,
+                                                        contentDescription = tab.title,
+                                                        countBadge = countBadge
+                                                    )
+                                                },
+                                                label = {
+                                                    Text(
+                                                        text = tab.title,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                },
+                                                colors = NavigationBarItemDefaults.colors(
+                                                    selectedIconColor = colors.onGold,
+                                                    selectedTextColor = colors.gold,
+                                                    indicatorColor = colors.gold,
+                                                    unselectedIconColor = colors.silver,
+                                                    unselectedTextColor = colors.silver
+                                                ),
+                                                modifier = Modifier.testTag(tab.tag)
+                                            )
+                                        }
                                     }
                                 }
                             }
-                        }
-                    ) { innerPadding ->
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(innerPadding)
-                        ) {
-                            if (vaultState is UiState.Error) {
-                                Surface(
-                                    color = CinemaCrimsonContainer,
-                                    shape = RoundedCornerShape(12.dp),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 6.dp)
-                                ) {
-                                    Text(
-                                        text = (vaultState as UiState.Error).message,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = CinemaAlabaster,
-                                        modifier = Modifier.padding(12.dp)
+                        ) { innerPadding ->
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(innerPadding)
+                            ) {
+                                if (vaultState is UiState.Error) {
+                                    Surface(
+                                        color = colors.crimsonContainer,
+                                        shape = RoundedCornerShape(12.dp),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 16.dp, vertical = 6.dp)
+                                    ) {
+                                        Text(
+                                            text = (vaultState as UiState.Error).message,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = colors.alabaster,
+                                            modifier = Modifier.padding(12.dp)
+                                        )
+                                    }
+                                }
+
+                                when (selectedTab) {
+                                    VaultTab.HOME -> HomeScreen(
+                                        homeState = homeUiState,
+                                        recentlyAdded = recentlyAddedCatalog,
+                                        keyConfigured = browseUiState.keyConfigured,
+                                        errorMessage = browseUiState.errorMessage,
+                                        vaultById = vaultById,
+                                        onRefreshTmdb = vaultViewModel::refreshTmdbFeeds,
+                                        onOttPlatformSelect = vaultViewModel::selectOttPlatform,
+                                        onOpenSearch = { selectedTab = VaultTab.SEARCH },
+                                        onGenreCollectionClick = { genreKeyword ->
+                                            vaultViewModel.openGenreCollectionInSearch(genreKeyword)
+                                            selectedTab = VaultTab.SEARCH
+                                        },
+                                        onViewAllClick = { title, items ->
+                                            activeSectionTitle = title
+                                            activeSectionItems = items
+                                            navController.navigate(ROUTE_SECTION)
+                                        },
+                                        onTitleClick = { id -> navController.navigate("detail/$id") },
+                                        onPersonClick = { pid -> navController.navigate("person/$pid") }
+                                    )
+
+                                    VaultTab.SEARCH -> BrowseScreen(
+                                        browseState = browseUiState,
+                                        localGenres = vaultViewModel.localGenres,
+                                        searchQuery = browseQuery,
+                                        selectedMediaFilter = browseMediaFilter,
+                                        vaultById = vaultById,
+                                        retapTrigger = searchRetapTrigger,
+                                        filterMenuTrigger = searchFilterMenuTrigger,
+                                        onSearchQueryChange = vaultViewModel::updateBrowseQuery,
+                                        onMediaFilterChange = vaultViewModel::updateBrowseMediaFilter,
+                                        onGenreToggle = vaultViewModel::toggleBrowseGenre,
+                                        onClearGenres = vaultViewModel::clearBrowseGenres,
+                                        onDiscoverSortSelect = vaultViewModel::selectDiscoverSort,
+                                        onSearchScopeSelect = vaultViewModel::selectSearchScope,
+                                        onViewModeChange = vaultViewModel::selectBrowseViewMode,
+                                        onLoadMore = vaultViewModel::loadNextPage,
+                                        onRefreshTmdb = vaultViewModel::refreshTmdbFeeds,
+                                        onTitleClick = { id -> navController.navigate("detail/$id") },
+                                        onPersonClick = { pid -> navController.navigate("person/$pid") },
+                                        onCollectionClick = { cid -> navController.navigate("collection/$cid") }
+                                    )
+
+                                    VaultTab.BUCKET_LIST -> WatchlistScreen(
+                                        entries = watchlistEntries,
+                                        stats = vaultStats,
+                                        selectedFilter = watchlistFilter,
+                                        selectedSort = watchlistSort,
+                                        viewMode = watchlistViewMode,
+                                        onFilterChange = vaultViewModel::updateWatchlistFilter,
+                                        onSortChange = vaultViewModel::updateWatchlistSort,
+                                        onViewModeChange = vaultViewModel::selectWatchlistViewMode,
+                                        onEntryClick = { id -> navController.navigate("detail/$id") },
+                                        onMarkWatched = { entry ->
+                                            if (!entry.isReleased) {
+                                                pendingUnreleased = PendingUnreleased(
+                                                    title = entry.title,
+                                                    releaseDate = entry.releaseDate,
+                                                    releaseYear = entry.releaseYear.toInt(),
+                                                    catalogTitle = vaultViewModel.resolveCatalogTitle(entry.catalogId),
+                                                    existingEntry = entry
+                                                )
+                                            } else {
+                                                pendingMarkSeen = PendingMarkSeen(
+                                                    catalogTitle = vaultViewModel.resolveCatalogTitle(entry.catalogId),
+                                                    existingEntry = entry
+                                                )
+                                            }
+                                        },
+                                        onBrowseClick = { selectedTab = VaultTab.HOME }
+                                    )
+
+                                    VaultTab.LIBRARY -> WatchedScreen(
+                                        entries = watchedEntries,
+                                        stats = vaultStats,
+                                        searchQuery = watchedSearchQuery,
+                                        selectedFilter = watchedFilter,
+                                        selectedTimeFilter = watchedTimeFilter,
+                                        selectedRatingFilter = watchedRatingFilter,
+                                        selectedGenre = watchedGenreFilter,
+                                        availableGenres = watchedAvailableGenres,
+                                        selectedSort = watchedSort,
+                                        onSearchQueryChange = vaultViewModel::updateWatchedSearchQuery,
+                                        onFilterChange = vaultViewModel::updateWatchedFilter,
+                                        onTimeFilterChange = vaultViewModel::updateWatchedTimeFilter,
+                                        onRatingFilterChange = vaultViewModel::updateWatchedRatingFilter,
+                                        onGenreChange = vaultViewModel::updateWatchedGenreFilter,
+                                        onSortChange = vaultViewModel::updateWatchedSort,
+                                        onResetFilters = vaultViewModel::resetWatchedFilters,
+                                        onEntryClick = { id -> navController.navigate("detail/$id") },
+                                        onOpenStats = { selectedTab = VaultTab.STATS },
+                                        onBrowseClick = { selectedTab = VaultTab.HOME }
+                                    )
+
+                                    VaultTab.STATS -> StatsScreen(
+                                        stats = detailedStats,
+                                        onBrowseClick = { selectedTab = VaultTab.HOME }
                                     )
                                 }
-                            }
-
-                            when (selectedTab) {
-                                VaultTab.HOME -> HomeScreen(
-                                    homeState = homeUiState,
-                                    recentlyAdded = recentlyAddedCatalog,
-                                    keyConfigured = browseUiState.keyConfigured,
-                                    errorMessage = browseUiState.errorMessage,
-                                    vaultById = vaultById,
-                                    onRefreshTmdb = vaultViewModel::refreshTmdbFeeds,
-                                    onOttPlatformSelect = vaultViewModel::selectOttPlatform,
-                                    onOpenSearch = { selectedTab = VaultTab.SEARCH },
-                                    onGenreCollectionClick = { genreKeyword ->
-                                        vaultViewModel.openGenreCollectionInSearch(genreKeyword)
-                                        selectedTab = VaultTab.SEARCH
-                                    },
-                                    onViewAllClick = { title, items ->
-                                        activeSectionTitle = title
-                                        activeSectionItems = items
-                                        navController.navigate(ROUTE_SECTION)
-                                    },
-                                    onTitleClick = { id -> navController.navigate("detail/$id") },
-                                    onPersonClick = { pid -> navController.navigate("person/$pid") }
-                                )
-
-                                VaultTab.SEARCH -> BrowseScreen(
-                                    browseState = browseUiState,
-                                    localGenres = vaultViewModel.localGenres,
-                                    searchQuery = browseQuery,
-                                    selectedMediaFilter = browseMediaFilter,
-                                    vaultById = vaultById,
-                                    retapTrigger = searchRetapTrigger,
-                                    filterMenuTrigger = searchFilterMenuTrigger,
-                                    onSearchQueryChange = vaultViewModel::updateBrowseQuery,
-                                    onMediaFilterChange = vaultViewModel::updateBrowseMediaFilter,
-                                    onGenreToggle = vaultViewModel::toggleBrowseGenre,
-                                    onClearGenres = vaultViewModel::clearBrowseGenres,
-                                    onDiscoverSortSelect = vaultViewModel::selectDiscoverSort,
-                                    onSearchScopeSelect = vaultViewModel::selectSearchScope,
-                                    onViewModeChange = vaultViewModel::selectBrowseViewMode,
-                                    onLoadMore = vaultViewModel::loadNextPage,
-                                    onRefreshTmdb = vaultViewModel::refreshTmdbFeeds,
-                                    onTitleClick = { id -> navController.navigate("detail/$id") },
-                                    onPersonClick = { pid -> navController.navigate("person/$pid") },
-                                    onCollectionClick = { cid -> navController.navigate("collection/$cid") }
-                                )
-
-                                VaultTab.BUCKET_LIST -> WatchlistScreen(
-                                    entries = watchlistEntries,
-                                    stats = vaultStats,
-                                    selectedFilter = watchlistFilter,
-                                    selectedSort = watchlistSort,
-                                    viewMode = watchlistViewMode,
-                                    onFilterChange = vaultViewModel::updateWatchlistFilter,
-                                    onSortChange = vaultViewModel::updateWatchlistSort,
-                                    onViewModeChange = vaultViewModel::selectWatchlistViewMode,
-                                    onEntryClick = { id -> navController.navigate("detail/$id") },
-                                    onMarkWatched = { entry ->
-                                        if (!entry.isReleased) {
-                                            pendingUnreleased = PendingUnreleased(
-                                                title = entry.title,
-                                                releaseDate = entry.releaseDate,
-                                                releaseYear = entry.releaseYear.toInt(),
-                                                catalogTitle = vaultViewModel.resolveCatalogTitle(entry.catalogId),
-                                                existingEntry = entry
-                                            )
-                                        } else {
-                                            pendingMarkSeen = PendingMarkSeen(
-                                                catalogTitle = vaultViewModel.resolveCatalogTitle(entry.catalogId),
-                                                existingEntry = entry
-                                            )
-                                        }
-                                    },
-                                    onBrowseClick = { selectedTab = VaultTab.HOME }
-                                )
-
-                                VaultTab.LIBRARY -> WatchedScreen(
-                                    entries = watchedEntries,
-                                    stats = vaultStats,
-                                    searchQuery = watchedSearchQuery,
-                                    selectedFilter = watchedFilter,
-                                    selectedTimeFilter = watchedTimeFilter,
-                                    selectedRatingFilter = watchedRatingFilter,
-                                    selectedGenre = watchedGenreFilter,
-                                    availableGenres = watchedAvailableGenres,
-                                    selectedSort = watchedSort,
-                                    onSearchQueryChange = vaultViewModel::updateWatchedSearchQuery,
-                                    onFilterChange = vaultViewModel::updateWatchedFilter,
-                                    onTimeFilterChange = vaultViewModel::updateWatchedTimeFilter,
-                                    onRatingFilterChange = vaultViewModel::updateWatchedRatingFilter,
-                                    onGenreChange = vaultViewModel::updateWatchedGenreFilter,
-                                    onSortChange = vaultViewModel::updateWatchedSort,
-                                    onResetFilters = vaultViewModel::resetWatchedFilters,
-                                    onEntryClick = { id -> navController.navigate("detail/$id") },
-                                    onOpenStats = { selectedTab = VaultTab.STATS },
-                                    onBrowseClick = { selectedTab = VaultTab.HOME }
-                                )
-
-                                VaultTab.STATS -> StatsScreen(
-                                    stats = detailedStats,
-                                    onBrowseClick = { selectedTab = VaultTab.HOME }
-                                )
                             }
                         }
                     }
@@ -579,19 +737,19 @@ fun CineVaultApp() {
 
         composable(ROUTE_REVIEWS) {
             Scaffold(
-                containerColor = CinemaObsidian,
+                containerColor = colors.obsidian,
                 topBar = {
                     TopAppBar(
                         colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = CinemaObsidian,
-                            titleContentColor = CinemaAlabaster
+                            containerColor = colors.obsidian,
+                            titleContentColor = colors.alabaster
                         ),
                         navigationIcon = {
                             IconButton(onClick = { navController.popBackStack() }) {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                                     contentDescription = "Back",
-                                    tint = CinemaAlabaster
+                                    tint = colors.alabaster
                                 )
                             }
                         },
@@ -599,7 +757,7 @@ fun CineVaultApp() {
                             Text(
                                 text = "Reviews Journal",
                                 style = MaterialTheme.typography.headlineSmall,
-                                color = CinemaAlabaster
+                                color = colors.alabaster
                             )
                         }
                     )
@@ -801,14 +959,71 @@ fun CineVaultApp() {
             }
         )
     }
+
+    if (authUser != null && pendingGuestMergeCount > 0) {
+        AlertDialog(
+            onDismissRequest = { vaultViewModel.dismissGuestMergePrompt() },
+            containerColor = colors.slate,
+            titleContentColor = colors.alabaster,
+            textContentColor = colors.silver,
+            icon = {
+                Icon(
+                    imageVector = Icons.Rounded.CloudSync,
+                    contentDescription = null,
+                    tint = colors.gold
+                )
+            },
+            title = { Text("Sync Local Vault to Cloud?") },
+            text = {
+                Text(
+                    "You have $pendingGuestMergeCount local ${if (pendingGuestMergeCount == 1) "title" else "titles"} on this device that aren't backed up to ${authUser?.email?.ifBlank { "your account" } ?: "your account"} yet. Merge them now?"
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { vaultViewModel.syncLocalVaultToCloud() },
+                    enabled = !isSyncingCloud,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = colors.gold,
+                        contentColor = colors.onGold
+                    ),
+                    modifier = Modifier.testTag("guest_merge_confirm_button")
+                ) {
+                    Text(if (isSyncingCloud) "Syncing…" else "Sync Now", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { vaultViewModel.dismissGuestMergePrompt() },
+                    modifier = Modifier.testTag("guest_merge_dismiss_button")
+                ) {
+                    Text("Later", color = colors.silver)
+                }
+            },
+            modifier = Modifier.testTag("guest_merge_dialog")
+        )
+    }
 }
 
 @Composable
 private fun StatusLivePill(
-    isLive: Boolean,
+    apiStatus: ApiConnectionStatus,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = CinemaTheme.colors
+    val isLive = apiStatus != ApiConnectionStatus.OFFLINE
+    val accent = when (apiStatus) {
+        ApiConnectionStatus.TMDB_OMDB_LIVE -> colors.emerald
+        ApiConnectionStatus.OMDB_FALLBACK -> colors.gold
+        ApiConnectionStatus.OFFLINE -> colors.silver
+    }
+    val label = when (apiStatus) {
+        ApiConnectionStatus.TMDB_OMDB_LIVE -> stringResource(id = R.string.tmdb_live)
+        ApiConnectionStatus.OMDB_FALLBACK -> "OMDb Live"
+        ApiConnectionStatus.OFFLINE -> stringResource(id = R.string.tmdb_offline)
+    }
+
     val pulseTransition = rememberInfiniteTransition(label = "status_live_pulse")
     val pulseScale by pulseTransition.animateFloat(
         initialValue = 0.78f,
@@ -830,11 +1045,11 @@ private fun StatusLivePill(
     )
 
     Surface(
-        color = if (isLive) CinemaEmerald.copy(alpha = 0.14f) else CinemaSlate,
+        color = if (isLive) accent.copy(alpha = 0.14f) else colors.slate,
         shape = CircleShape,
         border = BorderStroke(
             1.dp,
-            if (isLive) CinemaEmerald.copy(alpha = 0.45f) else CinemaBorderSubtle
+            if (isLive) accent.copy(alpha = 0.45f) else colors.borderSubtle
         ),
         modifier = modifier
             .clip(CircleShape)
@@ -859,32 +1074,28 @@ private fun StatusLivePill(
                                 alpha = pulseAlpha * 0.35f
                             }
                             .clip(CircleShape)
-                            .background(CinemaEmerald)
+                            .background(accent)
                     )
                     Box(
                         modifier = Modifier
                             .size(7.dp)
                             .clip(CircleShape)
-                            .background(CinemaEmerald)
+                            .background(accent)
                     )
                 }
             } else {
                 Icon(
                     imageVector = Icons.Rounded.Refresh,
                     contentDescription = "Refresh feeds",
-                    tint = CinemaGold,
+                    tint = colors.gold,
                     modifier = Modifier.size(14.dp)
                 )
             }
             Spacer(modifier = Modifier.width(6.dp))
             Text(
-                text = if (isLive) {
-                    stringResource(id = R.string.tmdb_live)
-                } else {
-                    stringResource(id = R.string.tmdb_offline)
-                },
+                text = label,
                 style = MaterialTheme.typography.labelMedium,
-                color = if (isLive) CinemaEmerald else CinemaAlabaster,
+                color = if (isLive) accent else colors.alabaster,
                 fontWeight = FontWeight.SemiBold
             )
         }
@@ -897,12 +1108,13 @@ private fun TabIconWithBadge(
     contentDescription: String,
     countBadge: Int
 ) {
+    val colors = CinemaTheme.colors
     if (countBadge > 0) {
         BadgedBox(
             badge = {
                 Badge(
-                    containerColor = CinemaGold,
-                    contentColor = CinemaObsidian
+                    containerColor = colors.gold,
+                    contentColor = colors.onGold
                 ) {
                     Text(
                         text = if (countBadge > 99) "99+" else "$countBadge",

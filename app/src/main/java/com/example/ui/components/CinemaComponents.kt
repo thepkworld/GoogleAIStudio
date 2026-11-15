@@ -49,16 +49,11 @@ import coil.request.ImageRequest
 import com.example.R
 import com.example.data.model.MediaType
 import com.example.data.model.WatchStatus
-import com.example.ui.theme.CinemaAlabaster
-import com.example.ui.theme.CinemaBorderSubtle
 import com.example.ui.theme.CinemaCrimson
 import com.example.ui.theme.CinemaEmerald
 import com.example.ui.theme.CinemaGold
 import com.example.ui.theme.CinemaIndigo
-import com.example.ui.theme.CinemaObsidian
-import com.example.ui.theme.CinemaSilver
-import com.example.ui.theme.CinemaSlate
-import com.example.ui.theme.CinemaSlateElevated
+import com.example.ui.theme.CinemaTheme
 import java.util.Locale
 
 @DrawableRes
@@ -120,13 +115,14 @@ fun CinemaPosterArtwork(
     userRating: Double = 0.0,
     status: WatchStatus? = null
 ) {
+    val colors = CinemaTheme.colors
     val tint = accentTintForKey(posterKey, title)
     val fallbackRes = posterDrawableForKey(posterKey)
 
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(cornerRadius))
-            .background(CinemaSlateElevated)
+            .background(colors.slateElevated)
     ) {
         if (posterUrl.isNotBlank()) {
             AsyncImage(
@@ -149,15 +145,15 @@ fun CinemaPosterArtwork(
             )
         }
 
-        // Subtle atmospheric gradient scrim for badge legibility
+        // Subtle atmospheric gradient scrim for badge legibility (always dark ink/scrim over poster art)
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        0.0f to if (posterUrl.isBlank()) tint.copy(alpha = 0.14f) else CinemaObsidian.copy(alpha = 0.18f),
+                        0.0f to if (posterUrl.isBlank()) tint.copy(alpha = 0.14f) else colors.scrimDark.copy(alpha = 0.18f),
                         0.6f to Color.Transparent,
-                        1.0f to CinemaObsidian.copy(alpha = if (posterUrl.isBlank()) 0.88f else 0.65f)
+                        1.0f to colors.scrimDark.copy(alpha = if (posterUrl.isBlank()) 0.88f else 0.65f)
                     )
                 )
         )
@@ -173,7 +169,7 @@ fun CinemaPosterArtwork(
             ) {
                 if (showMediaTypeBadge) {
                     Surface(
-                        color = CinemaObsidian.copy(alpha = 0.78f),
+                        color = colors.scrimDark.copy(alpha = 0.78f),
                         shape = RoundedCornerShape(6.dp),
                         border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.16f))
                     ) {
@@ -191,38 +187,38 @@ fun CinemaPosterArtwork(
                             Text(
                                 text = if (mediaType == MediaType.SERIES) "SERIES" else "FILM",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = CinemaAlabaster
+                                color = colors.onScrimLight
                             )
                         }
                     }
                 }
 
-            if (status != null) {
-                Surface(
-                    shape = CircleShape,
-                    color = if (status == WatchStatus.WATCHED) CinemaEmerald else CinemaGold,
-                    modifier = Modifier.size(22.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = if (status == WatchStatus.WATCHED) {
-                                Icons.Rounded.CheckCircle
-                            } else {
-                                Icons.Rounded.Bookmark
-                            },
-                            contentDescription = status.label,
-                            tint = CinemaObsidian,
-                            modifier = Modifier.size(14.dp)
-                        )
+                if (status != null) {
+                    Surface(
+                        shape = CircleShape,
+                        color = if (status == WatchStatus.WATCHED) CinemaEmerald else CinemaGold,
+                        modifier = Modifier.size(22.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = if (status == WatchStatus.WATCHED) {
+                                    Icons.Rounded.CheckCircle
+                                } else {
+                                    Icons.Rounded.Bookmark
+                                },
+                                contentDescription = status.label,
+                                tint = colors.scrimDark,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
                     }
                 }
             }
         }
-        }
 
         if (showBottomBadge && userRating > 0.0) {
             Surface(
-                color = CinemaObsidian.copy(alpha = 0.84f),
+                color = colors.scrimDark.copy(alpha = 0.84f),
                 shape = RoundedCornerShape(8.dp),
                 border = BorderStroke(0.8.dp, CinemaGold.copy(alpha = 0.55f)),
                 modifier = Modifier
@@ -255,7 +251,7 @@ fun CinemaPosterArtwork(
 fun RatingPill(
     score: Double,
     labelPrefix: String = "",
-    accentColor: Color = CinemaGold,
+    accentColor: Color = CinemaTheme.colors.gold,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -296,8 +292,9 @@ fun StatusPill(
     status: WatchStatus,
     modifier: Modifier = Modifier
 ) {
+    val colors = CinemaTheme.colors
     val isWatched = status == WatchStatus.WATCHED
-    val color = if (isWatched) CinemaEmerald else CinemaGold
+    val color = if (isWatched) colors.emerald else colors.gold
     Surface(
         color = color.copy(alpha = 0.16f),
         shape = RoundedCornerShape(8.dp),
@@ -335,10 +332,11 @@ fun EmptyVaultState(
     onActionClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val colors = CinemaTheme.colors
     Surface(
-        color = CinemaSlate.copy(alpha = 0.72f),
+        color = colors.slate.copy(alpha = 0.72f),
         shape = RoundedCornerShape(22.dp),
-        border = BorderStroke(1.dp, CinemaBorderSubtle),
+        border = BorderStroke(1.dp, colors.borderSubtle),
         modifier = modifier.fillMaxWidth()
     ) {
         Column(
@@ -351,13 +349,13 @@ fun EmptyVaultState(
                 modifier = Modifier
                     .size(58.dp)
                     .clip(CircleShape)
-                    .background(CinemaGold.copy(alpha = 0.14f)),
+                    .background(colors.gold.copy(alpha = 0.14f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = CinemaGold,
+                    tint = colors.gold,
                     modifier = Modifier.size(28.dp)
                 )
             }
@@ -365,14 +363,14 @@ fun EmptyVaultState(
             Text(
                 text = title,
                 style = MaterialTheme.typography.headlineSmall,
-                color = CinemaAlabaster,
+                color = colors.alabaster,
                 textAlign = TextAlign.Center
             )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodyMedium,
-                color = CinemaSilver,
+                color = colors.silver,
                 textAlign = TextAlign.Center
             )
             if (actionLabel != null && onActionClick != null) {
@@ -381,8 +379,8 @@ fun EmptyVaultState(
                     onClick = onActionClick,
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = CinemaGold,
-                        contentColor = CinemaObsidian
+                        containerColor = colors.gold,
+                        contentColor = colors.onGold
                     ),
                     modifier = Modifier.height(48.dp)
                 ) {

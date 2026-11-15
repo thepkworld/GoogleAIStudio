@@ -38,13 +38,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.data.model.MediaType
 import com.example.data.model.WatchStatus
-import com.example.ui.theme.CinemaAlabaster
-import com.example.ui.theme.CinemaBorderSubtle
-import com.example.ui.theme.CinemaEmerald
-import com.example.ui.theme.CinemaGold
-import com.example.ui.theme.CinemaObsidian
-import com.example.ui.theme.CinemaSilver
-import com.example.ui.theme.CinemaSlate
+import com.example.ui.theme.CinemaTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,6 +58,7 @@ fun AddCustomTitleSheet(
         totalEpisodes: Int
     ) -> Unit
 ) {
+    val colors = CinemaTheme.colors
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     var title by remember { mutableStateOf("") }
@@ -87,8 +82,8 @@ fun AddCustomTitleSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = CinemaSlate,
-        contentColor = CinemaAlabaster
+        containerColor = colors.slate,
+        contentColor = colors.alabaster
     ) {
         Column(
             modifier = Modifier
@@ -100,12 +95,12 @@ fun AddCustomTitleSheet(
             Text(
                 text = "Add Movie or Series",
                 style = MaterialTheme.typography.headlineMedium,
-                color = CinemaAlabaster
+                color = colors.alabaster
             )
             Text(
                 text = "Log any film or show directly into your personal CinemaPaglu.",
                 style = MaterialTheme.typography.bodySmall,
-                color = CinemaSilver
+                color = colors.silver
             )
 
             // Media Type Switch
@@ -117,8 +112,8 @@ fun AddCustomTitleSheet(
                         onClick = { mediaType = type },
                         label = { Text(type.label) },
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = CinemaGold,
-                            selectedLabelColor = CinemaObsidian
+                            selectedContainerColor = colors.gold,
+                            selectedLabelColor = colors.onGold
                         )
                     )
                 }
@@ -128,14 +123,19 @@ fun AddCustomTitleSheet(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 WatchStatus.entries.forEach { ws ->
                     val selected = status == ws
-                    val activeColor = if (ws == WatchStatus.WATCHED) CinemaEmerald else CinemaGold
+                    val activeColor = if (ws == WatchStatus.WATCHED) colors.emerald else colors.gold
+                    val activeLabelColor = if (ws == WatchStatus.WATCHED) {
+                        MaterialTheme.colorScheme.onTertiary
+                    } else {
+                        colors.onGold
+                    }
                     FilterChip(
                         selected = selected,
                         onClick = { status = ws },
                         label = { Text(ws.label) },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = activeColor,
-                            selectedLabelColor = CinemaObsidian
+                            selectedLabelColor = activeLabelColor
                         )
                     )
                 }
@@ -219,15 +219,15 @@ fun AddCustomTitleSheet(
                 Text(
                     text = "Poster Aesthetic",
                     style = MaterialTheme.typography.labelLarge,
-                    color = CinemaSilver
+                    color = colors.silver
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     posterThemes.forEach { (key, label) ->
                         val selected = posterKey == key
                         Surface(
-                            color = if (selected) CinemaGold else CinemaObsidian,
+                            color = if (selected) colors.gold else colors.obsidian,
                             shape = RoundedCornerShape(10.dp),
-                            border = BorderStroke(1.dp, if (selected) CinemaGold else CinemaBorderSubtle),
+                            border = BorderStroke(1.dp, if (selected) colors.gold else colors.borderSubtle),
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(10.dp))
@@ -236,7 +236,7 @@ fun AddCustomTitleSheet(
                             Text(
                                 text = label,
                                 style = MaterialTheme.typography.labelMedium,
-                                color = if (selected) CinemaObsidian else CinemaSilver,
+                                color = if (selected) colors.onGold else colors.silver,
                                 modifier = Modifier.padding(vertical = 10.dp, horizontal = 8.dp)
                             )
                         }
@@ -269,8 +269,8 @@ fun AddCustomTitleSheet(
                 enabled = title.trim().isNotEmpty() && !isMutating,
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = CinemaGold,
-                    contentColor = CinemaObsidian
+                    containerColor = colors.gold,
+                    contentColor = colors.onGold
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -291,11 +291,11 @@ fun AddCustomTitleSheet(
 
 @Composable
 private fun customFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedBorderColor = CinemaGold,
-    unfocusedBorderColor = CinemaBorderSubtle,
-    focusedLabelColor = CinemaGold,
-    unfocusedLabelColor = CinemaSilver,
-    focusedTextColor = CinemaAlabaster,
-    unfocusedTextColor = CinemaAlabaster,
-    cursorColor = CinemaGold
+    focusedBorderColor = CinemaTheme.colors.gold,
+    unfocusedBorderColor = CinemaTheme.colors.borderSubtle,
+    focusedLabelColor = CinemaTheme.colors.gold,
+    unfocusedLabelColor = CinemaTheme.colors.silver,
+    focusedTextColor = CinemaTheme.colors.alabaster,
+    unfocusedTextColor = CinemaTheme.colors.alabaster,
+    cursorColor = CinemaTheme.colors.gold
 )

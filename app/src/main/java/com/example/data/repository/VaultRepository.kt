@@ -364,4 +364,71 @@ class VaultRepository(
             Result.failure(e)
         }
     }
+
+    suspend fun getAllEntriesOnce(): Result<List<VaultEntry>> {
+        return try {
+            Result.success(dao.getAllEntriesOnce().map { it.toDomain() })
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun importAndMergeEntries(entries: List<VaultEntry>): Result<Pair<Int, Int>> {
+        return try {
+            if (entries.isEmpty()) return Result.success(0 to 0)
+            val existingById = dao.getAllEntriesOnce().associateBy { it.id }
+            var insertedCount = 0
+            var updatedCount = 0
+            val toUpsert = mutableListOf<VaultEntryEntity>()
+
+            entries.forEach { incoming ->
+                val cleanEntity = VaultEntryEntity.fromDomain(incoming)
+                val existing = existingById[cleanEntity.id]
+                if (existing == null) {
+                    insertedCount++
+                    toUpsert.add(cleanEntity)
+                } else {
+                    updatedCount++
+                    toUpsert.add(
+                        cleanEntity.copy(
+                            createdAt = minOf(existing.createdAt, cleanEntity.createdAt),
+                            updatedAt = maxOf(existing.updatedAt, cleanEntity.updatedAt, System.currentTimeMillis())
+                        )
+                    )
+                }
+            }
+            if (toUpsert.isNotEmpty()) {
+                dao.upsertEntries(toUpsert)
+            }
+            Result.success(insertedCount to updatedCount)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun mergeRemoteEntries(remoteEntries: List<VaultEntry>): Result<Int> {
+        return try {
+            if (remoteEntries.isEmpty()) return Result.success(0)
+            val localById = dao.getAllEntriesOnce().associateBy { it.id }
+            val toUpsert = mutableListOf<VaultEntryEntity>()
+            remoteEntries.forEach { remote ->
+                val local = localById[remote.id]
+                if (local == null || remote.updatedAt >= local.updatedAt) {
+                    toUpsert.add(VaultEntryEntity.fromDomain(remote))
+                }
+            }
+            if (toUpsert.isNotEmpty()) {
+                dao.upsertEntries(toUpsert)
+            }
+            Result.success(toUpsert.size)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }

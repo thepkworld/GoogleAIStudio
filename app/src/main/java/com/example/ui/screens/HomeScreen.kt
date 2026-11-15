@@ -88,16 +88,12 @@ import com.example.ui.HomeUiState
 import com.example.ui.components.CinemaBackdropImage
 import com.example.ui.components.CinemaPosterArtwork
 import com.example.ui.components.RatingPill
-import com.example.ui.theme.CinemaAlabaster
-import com.example.ui.theme.CinemaBorderSubtle
 import com.example.ui.theme.CinemaCrimson
 import com.example.ui.theme.CinemaEmerald
 import com.example.ui.theme.CinemaGold
 import com.example.ui.theme.CinemaIndigo
 import com.example.ui.theme.CinemaObsidian
-import com.example.ui.theme.CinemaSilver
-import com.example.ui.theme.CinemaSlate
-import com.example.ui.theme.CinemaSlateElevated
+import com.example.ui.theme.CinemaTheme
 
 private data class GenreCollectionCard(
     val title: String,
@@ -134,6 +130,7 @@ fun HomeScreen(
     onPersonClick: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = CinemaTheme.colors
     val hero = homeState.featuredTitle
 
     LazyColumn(
@@ -144,9 +141,9 @@ fun HomeScreen(
         if (!keyConfigured || errorMessage != null) {
             item(key = "home_tmdb_notice") {
                 Surface(
-                    color = CinemaSlate,
+                    color = colors.slate,
                     shape = RoundedCornerShape(14.dp),
-                    border = BorderStroke(1.dp, CinemaGold.copy(alpha = 0.35f)),
+                    border = BorderStroke(1.dp, colors.gold.copy(alpha = 0.35f)),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp)
@@ -161,14 +158,14 @@ fun HomeScreen(
                         Icon(
                             imageVector = Icons.Rounded.Info,
                             contentDescription = null,
-                            tint = CinemaGold,
+                            tint = colors.gold,
                             modifier = Modifier.size(18.dp)
                         )
                         Text(
                             text = errorMessage
-                                ?: "Curated cinema active. Add TMDB_API_KEY in Secrets for live streaming & theatre feeds.",
+                                ?: "Curated cinema active. Configure TMDB or OMDb keys for live feeds.",
                             style = MaterialTheme.typography.bodySmall,
-                            color = CinemaSilver,
+                            color = colors.silver,
                             modifier = Modifier.weight(1f)
                         )
                         IconButton(
@@ -178,7 +175,7 @@ fun HomeScreen(
                             Icon(
                                 imageVector = Icons.Rounded.Refresh,
                                 contentDescription = "Retry live sync",
-                                tint = CinemaGold,
+                                tint = colors.gold,
                                 modifier = Modifier.size(18.dp)
                             )
                         }
@@ -190,9 +187,9 @@ fun HomeScreen(
         // Quick Search Bar Shortcut
         item(key = "home_search_shortcut") {
             Surface(
-                color = CinemaSlate,
+                color = colors.slate,
                 shape = RoundedCornerShape(16.dp),
-                border = BorderStroke(1.dp, CinemaBorderSubtle),
+                border = BorderStroke(1.dp, colors.borderSubtle),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
@@ -210,13 +207,13 @@ fun HomeScreen(
                     Icon(
                         imageVector = Icons.Rounded.Search,
                         contentDescription = null,
-                        tint = CinemaGold,
+                        tint = colors.gold,
                         modifier = Modifier.size(20.dp)
                     )
                     Text(
                         text = "Search movies, series, stars, or franchises…",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = CinemaSilver.copy(alpha = 0.85f),
+                        color = colors.silver.copy(alpha = 0.85f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f)
@@ -248,7 +245,7 @@ fun HomeScreen(
                     title = "Trending Now",
                     subtitle = "Global hits capturing audiences today",
                     icon = Icons.Rounded.LocalFireDepartment,
-                    accentColor = CinemaGold,
+                    accentColor = colors.gold,
                     items = homeState.trendingNow,
                     vaultById = vaultById,
                     keyPrefix = "trending",
@@ -265,7 +262,7 @@ fun HomeScreen(
                     title = "Latest Bollywood Movies",
                     subtitle = "Fresh Hindi cinema & Indian releases",
                     icon = Icons.Rounded.Whatshot,
-                    accentColor = CinemaGold,
+                    accentColor = colors.gold,
                     items = homeState.bollywoodMovies,
                     vaultById = vaultById,
                     keyPrefix = "bolly",
@@ -282,7 +279,7 @@ fun HomeScreen(
                     title = "Latest Hollywood Movies",
                     subtitle = "Recent US studio & theatrical releases",
                     icon = Icons.Rounded.Theaters,
-                    accentColor = CinemaGold,
+                    accentColor = colors.gold,
                     items = homeState.hollywoodMovies,
                     vaultById = vaultById,
                     keyPrefix = "holly",
@@ -299,7 +296,7 @@ fun HomeScreen(
                     title = "Upcoming Movies",
                     subtitle = "Coming soon to theatres — save to Bucketlist",
                     icon = Icons.Rounded.Upcoming,
-                    accentColor = CinemaIndigo,
+                    accentColor = colors.indigo,
                     items = homeState.upcomingMovies,
                     vaultById = vaultById,
                     keyPrefix = "upcoming",
@@ -317,7 +314,7 @@ fun HomeScreen(
                     title = "Popular on Netflix",
                     subtitle = "Most-watched films streaming on Netflix",
                     icon = Icons.Rounded.PlayCircle,
-                    accentColor = CinemaCrimson,
+                    accentColor = colors.crimson,
                     items = homeState.netflixPopular,
                     vaultById = vaultById,
                     keyPrefix = "netflix",
@@ -334,7 +331,7 @@ fun HomeScreen(
                     title = "Popular on Amazon Prime",
                     subtitle = "Top streaming picks on Prime Video",
                     icon = Icons.Rounded.LiveTv,
-                    accentColor = Color(0xFF4CC9F0),
+                    accentColor = Color(0xFF0096C7),
                     items = homeState.primePopular,
                     vaultById = vaultById,
                     keyPrefix = "prime",
@@ -351,7 +348,7 @@ fun HomeScreen(
                     title = "Latest OTT Release Movies",
                     subtitle = "Fresh digital premieres across platforms",
                     icon = Icons.Rounded.NewReleases,
-                    accentColor = CinemaEmerald,
+                    accentColor = colors.emerald,
                     onViewAll = if (homeState.ottNewMovies.isNotEmpty()) {
                         {
                             onViewAllClick(
@@ -378,16 +375,16 @@ fun HomeScreen(
                                 )
                             },
                             colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = CinemaEmerald,
-                                selectedLabelColor = CinemaObsidian,
-                                containerColor = CinemaSlate,
-                                labelColor = CinemaSilver
+                                selectedContainerColor = colors.emerald,
+                                selectedLabelColor = MaterialTheme.colorScheme.onTertiary,
+                                containerColor = colors.slate,
+                                labelColor = colors.silver
                             ),
                             border = FilterChipDefaults.filterChipBorder(
                                 enabled = true,
                                 selected = selected,
-                                borderColor = CinemaBorderSubtle,
-                                selectedBorderColor = CinemaEmerald
+                                borderColor = colors.borderSubtle,
+                                selectedBorderColor = colors.emerald
                             ),
                             modifier = Modifier.testTag("ott_chip_${platform.name.lowercase()}")
                         )
@@ -396,8 +393,8 @@ fun HomeScreen(
 
                 if (homeState.isLoadingOtt) {
                     LinearProgressIndicator(
-                        color = CinemaEmerald,
-                        trackColor = CinemaSlateElevated,
+                        color = colors.emerald,
+                        trackColor = colors.slateElevated,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp)
@@ -428,7 +425,7 @@ fun HomeScreen(
                     title = "Top Rated",
                     subtitle = "Critically acclaimed highest-rated cinema",
                     icon = Icons.Rounded.Star,
-                    accentColor = CinemaGold,
+                    accentColor = colors.gold,
                     items = homeState.topRatedMovies,
                     vaultById = vaultById,
                     keyPrefix = "toprated",
@@ -445,7 +442,7 @@ fun HomeScreen(
                     title = "Most Anticipated",
                     subtitle = "High-buzz future releases on everyone's radar",
                     icon = Icons.Rounded.AutoAwesome,
-                    accentColor = CinemaGold,
+                    accentColor = colors.gold,
                     items = homeState.mostAnticipatedMovies,
                     vaultById = vaultById,
                     keyPrefix = "anticipated",
@@ -463,7 +460,7 @@ fun HomeScreen(
                     title = "Recently Added",
                     subtitle = "Latest additions to your catalogue & spotlight",
                     icon = Icons.Rounded.BookmarkAdd,
-                    accentColor = CinemaEmerald,
+                    accentColor = colors.emerald,
                     items = recentlyAdded,
                     vaultById = vaultById,
                     keyPrefix = "recent",
@@ -480,7 +477,7 @@ fun HomeScreen(
                     title = "Genre Collections",
                     subtitle = "Explore curated moods & cinematic genres",
                     icon = Icons.Rounded.Category,
-                    accentColor = CinemaGold,
+                    accentColor = colors.gold,
                     onViewAll = onOpenSearch
                 )
                 LazyRow(
@@ -504,7 +501,7 @@ fun HomeScreen(
                     title = "Classic Cinema",
                     subtitle = "Timeless pre-2000 masterworks",
                     icon = Icons.Rounded.HistoryEdu,
-                    accentColor = CinemaGold,
+                    accentColor = colors.gold,
                     items = homeState.classicMovies,
                     vaultById = vaultById,
                     keyPrefix = "classic",
@@ -522,7 +519,7 @@ fun HomeScreen(
                         title = "Trending Stars & Creators",
                         subtitle = "Tap to explore biography & filmography",
                         icon = Icons.Rounded.Public,
-                        accentColor = CinemaGold
+                        accentColor = colors.gold
                     )
                     LazyRow(
                         contentPadding = PaddingValues(horizontal = 16.dp),
@@ -543,6 +540,7 @@ fun HomeScreen(
 
 @Composable
 private fun HomeSkeletonLoader() {
+    val colors = CinemaTheme.colors
     val transition = rememberInfiniteTransition(label = "skeleton_shimmer")
     val alpha by transition.animateFloat(
         initialValue = 0.28f,
@@ -569,14 +567,14 @@ private fun HomeSkeletonLoader() {
                     .width(160.dp)
                     .height(18.dp)
                     .clip(RoundedCornerShape(6.dp))
-                    .background(CinemaSlateElevated.copy(alpha = alpha))
+                    .background(colors.slateElevated.copy(alpha = alpha))
             )
             Box(
                 modifier = Modifier
                     .width(64.dp)
                     .height(16.dp)
                     .clip(RoundedCornerShape(6.dp))
-                    .background(CinemaSlateElevated.copy(alpha = alpha))
+                    .background(colors.slateElevated.copy(alpha = alpha))
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -586,7 +584,7 @@ private fun HomeSkeletonLoader() {
                         .width(142.dp)
                         .height(210.dp)
                         .clip(RoundedCornerShape(16.dp))
-                        .background(CinemaSlateElevated.copy(alpha = alpha))
+                        .background(colors.slateElevated.copy(alpha = alpha))
                 )
             }
         }
@@ -601,6 +599,7 @@ private fun HomeSectionHeader(
     accentColor: Color,
     onViewAll: (() -> Unit)? = null
 ) {
+    val colors = CinemaTheme.colors
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -631,14 +630,14 @@ private fun HomeSectionHeader(
                 Text(
                     text = title,
                     style = MaterialTheme.typography.headlineSmall,
-                    color = CinemaAlabaster,
+                    color = colors.alabaster,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
-                    color = CinemaSilver,
+                    color = colors.silver,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -711,6 +710,7 @@ private fun HomeMovieCard(
     showUpcomingTag: Boolean = false,
     onClick: () -> Unit
 ) {
+    val colors = CinemaTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
@@ -720,11 +720,11 @@ private fun HomeMovieCard(
     )
 
     Surface(
-        color = CinemaSlate,
+        color = colors.slate,
         shape = RoundedCornerShape(16.dp),
         border = BorderStroke(
             1.dp,
-            if (pressed) CinemaGold.copy(alpha = 0.65f) else CinemaBorderSubtle
+            if (pressed) colors.gold.copy(alpha = 0.65f) else colors.borderSubtle
         ),
         modifier = Modifier
             .width(152.dp)
@@ -771,14 +771,14 @@ private fun HomeMovieCard(
                             Icon(
                                 imageVector = Icons.Rounded.Schedule,
                                 contentDescription = null,
-                                tint = CinemaAlabaster,
+                                tint = colors.onScrimLight,
                                 modifier = Modifier.size(10.dp)
                             )
                             Spacer(modifier = Modifier.width(3.dp))
                             Text(
                                 text = "SOON",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = CinemaAlabaster,
+                                color = colors.onScrimLight,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -789,7 +789,7 @@ private fun HomeMovieCard(
             Text(
                 text = title.title,
                 style = MaterialTheme.typography.titleSmall,
-                color = CinemaAlabaster,
+                color = colors.alabaster,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -808,7 +808,7 @@ private fun HomeMovieCard(
                     }
                 },
                 style = MaterialTheme.typography.bodySmall,
-                color = CinemaSilver,
+                color = colors.silver,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -821,9 +821,10 @@ private fun GenreCollectionTile(
     item: GenreCollectionCard,
     onClick: () -> Unit
 ) {
+    val colors = CinemaTheme.colors
     Surface(
         shape = RoundedCornerShape(18.dp),
-        border = BorderStroke(1.dp, item.gradientStart.copy(alpha = 0.45f)),
+        border = BorderStroke(1.dp, item.gradientStart.copy(alpha = 0.55f)),
         modifier = Modifier
             .width(154.dp)
             .height(94.dp)
@@ -837,7 +838,7 @@ private fun GenreCollectionTile(
                 .background(
                     Brush.linearGradient(
                         listOf(
-                            item.gradientStart.copy(alpha = 0.34f),
+                            item.gradientStart.copy(alpha = 0.65f),
                             item.gradientEnd
                         )
                     )
@@ -851,13 +852,13 @@ private fun GenreCollectionTile(
                 Text(
                     text = item.title,
                     style = MaterialTheme.typography.titleMedium,
-                    color = CinemaAlabaster,
+                    color = colors.onScrimLight,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
                     text = item.subtitle,
                     style = MaterialTheme.typography.labelSmall,
-                    color = CinemaSilver,
+                    color = colors.onScrimMuted,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -880,10 +881,11 @@ private fun HomeHeroCard(
     isLiveTmdb: Boolean,
     onTitleClick: () -> Unit
 ) {
+    val colors = CinemaTheme.colors
     Surface(
-        color = CinemaSlate,
+        color = colors.slate,
         shape = RoundedCornerShape(24.dp),
-        border = BorderStroke(1.dp, CinemaGold.copy(alpha = 0.30f)),
+        border = BorderStroke(1.dp, colors.gold.copy(alpha = 0.30f)),
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
@@ -906,9 +908,9 @@ private fun HomeHeroCard(
                     .height(250.dp)
                     .background(
                         Brush.verticalGradient(
-                            0.0f to CinemaObsidian.copy(alpha = 0.16f),
-                            0.45f to CinemaObsidian.copy(alpha = 0.68f),
-                            1.0f to CinemaObsidian.copy(alpha = 0.96f)
+                            0.0f to colors.scrimDark.copy(alpha = 0.16f),
+                            0.45f to colors.scrimDark.copy(alpha = 0.68f),
+                            1.0f to colors.scrimDark.copy(alpha = 0.96f)
                         )
                     )
             )
@@ -928,23 +930,23 @@ private fun HomeHeroCard(
                         Text(
                             text = if (isLiveTmdb) "TONIGHT'S SPOTLIGHT" else "FEATURED PREMIERE",
                             style = MaterialTheme.typography.labelSmall,
-                            color = CinemaObsidian,
+                            color = colors.scrimDark,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                         )
                     }
-                    RatingPill(score = title.criticScore)
+                    RatingPill(score = title.criticScore, accentColor = CinemaGold)
                     Text(
                         text = "${title.releaseYear} · ${if (title.mediaType == MediaType.SERIES) "Series" else "Movie"}",
                         style = MaterialTheme.typography.labelMedium,
-                        color = CinemaSilver
+                        color = colors.onScrimMuted
                     )
                 }
 
                 Text(
                     text = title.title,
                     style = MaterialTheme.typography.displayMedium,
-                    color = CinemaAlabaster,
+                    color = colors.onScrimLight,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -952,7 +954,7 @@ private fun HomeHeroCard(
                 Text(
                     text = title.synopsis,
                     style = MaterialTheme.typography.bodySmall,
-                    color = CinemaSilver,
+                    color = colors.onScrimMuted,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -984,6 +986,7 @@ private fun HomePersonCard(
     person: PersonSummary,
     onClick: () -> Unit
 ) {
+    val colors = CinemaTheme.colors
     Column(
         modifier = Modifier
             .width(92.dp)
@@ -1004,20 +1007,20 @@ private fun HomePersonCard(
                 modifier = Modifier
                     .size(72.dp)
                     .clip(CircleShape)
-                    .background(CinemaSlateElevated)
+                    .background(colors.slateElevated)
             )
         } else {
             Box(
                 modifier = Modifier
                     .size(72.dp)
                     .clip(CircleShape)
-                    .background(CinemaSlateElevated),
+                    .background(colors.slateElevated),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Person,
                     contentDescription = null,
-                    tint = CinemaGold,
+                    tint = colors.gold,
                     modifier = Modifier.size(28.dp)
                 )
             }
@@ -1025,7 +1028,7 @@ private fun HomePersonCard(
         Text(
             text = person.name,
             style = MaterialTheme.typography.labelLarge,
-            color = CinemaAlabaster,
+            color = colors.alabaster,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center
@@ -1033,7 +1036,7 @@ private fun HomePersonCard(
         Text(
             text = person.knownForDepartment,
             style = MaterialTheme.typography.labelSmall,
-            color = CinemaGold,
+            color = colors.gold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )

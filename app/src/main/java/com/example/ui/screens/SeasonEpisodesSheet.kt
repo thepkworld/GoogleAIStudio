@@ -38,13 +38,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.data.model.SeasonDetail
 import com.example.ui.components.RatingPill
-import com.example.ui.theme.CinemaAlabaster
-import com.example.ui.theme.CinemaBorderSubtle
-import com.example.ui.theme.CinemaGold
-import com.example.ui.theme.CinemaObsidian
-import com.example.ui.theme.CinemaSilver
-import com.example.ui.theme.CinemaSlate
-import com.example.ui.theme.CinemaSlateElevated
+import com.example.ui.theme.CinemaTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,13 +47,14 @@ fun SeasonEpisodesSheet(
     isLoading: Boolean,
     onDismiss: () -> Unit
 ) {
+    val colors = CinemaTheme.colors
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = CinemaSlate,
-        contentColor = CinemaAlabaster
+        containerColor = colors.slate,
+        contentColor = colors.alabaster
     ) {
         if (isLoading && seasonDetail == null) {
             Box(
@@ -68,7 +63,7 @@ fun SeasonEpisodesSheet(
                     .height(220.dp),
                 contentAlignment = Alignment.Center
             ) {
-                CircularProgressIndicator(color = CinemaGold)
+                CircularProgressIndicator(color = colors.gold)
             }
         } else if (seasonDetail != null) {
             LazyColumn(
@@ -80,7 +75,7 @@ fun SeasonEpisodesSheet(
                         Text(
                             text = seasonDetail.name,
                             style = MaterialTheme.typography.headlineMedium,
-                            color = CinemaAlabaster
+                            color = colors.alabaster
                         )
                         if (seasonDetail.airDate.isNotBlank() || seasonDetail.episodes.isNotEmpty()) {
                             Text(
@@ -89,14 +84,14 @@ fun SeasonEpisodesSheet(
                                     "${seasonDetail.episodes.size} Episodes"
                                 ).filterNotNull().joinToString(" · "),
                                 style = MaterialTheme.typography.labelMedium,
-                                color = CinemaGold
+                                color = colors.gold
                             )
                         }
                         if (seasonDetail.overview.isNotBlank()) {
                             Text(
                                 text = seasonDetail.overview,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = CinemaSilver,
+                                color = colors.silver,
                                 modifier = Modifier.padding(top = 4.dp)
                             )
                         }
@@ -105,9 +100,9 @@ fun SeasonEpisodesSheet(
 
                 items(seasonDetail.episodes, key = { it.id }) { ep ->
                     Surface(
-                        color = CinemaObsidian,
+                        color = colors.obsidian,
                         shape = RoundedCornerShape(14.dp),
-                        border = BorderStroke(1.dp, CinemaBorderSubtle),
+                        border = BorderStroke(1.dp, colors.borderSubtle),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(
@@ -127,7 +122,7 @@ fun SeasonEpisodesSheet(
                                             .width(106.dp)
                                             .height(62.dp)
                                             .clip(RoundedCornerShape(10.dp))
-                                            .background(CinemaSlateElevated)
+                                            .background(colors.slateElevated)
                                     )
                                 } else {
                                     Box(
@@ -135,13 +130,13 @@ fun SeasonEpisodesSheet(
                                             .width(106.dp)
                                             .height(62.dp)
                                             .clip(RoundedCornerShape(10.dp))
-                                            .background(CinemaSlateElevated),
+                                            .background(colors.slateElevated),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
                                             imageVector = Icons.Rounded.Movie,
                                             contentDescription = null,
-                                            tint = CinemaGold,
+                                            tint = colors.gold,
                                             modifier = Modifier.size(22.dp)
                                         )
                                     }
@@ -160,7 +155,7 @@ fun SeasonEpisodesSheet(
                                         Text(
                                             text = "E${ep.episodeNumber}",
                                             style = MaterialTheme.typography.labelLarge,
-                                            color = CinemaGold
+                                            color = colors.gold
                                         )
                                         if (ep.voteAverage > 0.0) {
                                             RatingPill(score = ep.voteAverage)
@@ -169,7 +164,7 @@ fun SeasonEpisodesSheet(
                                     Text(
                                         text = ep.name,
                                         style = MaterialTheme.typography.titleSmall,
-                                        color = CinemaAlabaster,
+                                        color = colors.alabaster,
                                         maxLines = 2,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -181,7 +176,7 @@ fun SeasonEpisodesSheet(
                                         Text(
                                             text = meta,
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = CinemaSilver
+                                            color = colors.silver
                                         )
                                     }
                                 }
@@ -191,7 +186,7 @@ fun SeasonEpisodesSheet(
                                 Text(
                                     text = ep.overview,
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = CinemaSilver
+                                    color = colors.silver
                                 )
                             }
                         }

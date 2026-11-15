@@ -34,12 +34,7 @@ import androidx.compose.ui.unit.dp
 import com.example.data.model.CatalogTitle
 import com.example.data.model.VaultEntry
 import com.example.ui.components.CinemaPosterArtwork
-import com.example.ui.theme.CinemaAlabaster
-import com.example.ui.theme.CinemaBorderSubtle
-import com.example.ui.theme.CinemaGold
-import com.example.ui.theme.CinemaObsidian
-import com.example.ui.theme.CinemaSilver
-import com.example.ui.theme.CinemaSlate
+import com.example.ui.theme.CinemaTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -50,13 +45,14 @@ fun SectionGridScreen(
     onBack: () -> Unit,
     onTitleClick: (String) -> Unit
 ) {
+    val colors = CinemaTheme.colors
     Scaffold(
-        containerColor = CinemaObsidian,
+        containerColor = colors.obsidian,
         topBar = {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = CinemaObsidian,
-                    titleContentColor = CinemaAlabaster
+                    containerColor = colors.obsidian,
+                    titleContentColor = colors.alabaster
                 ),
                 navigationIcon = {
                     IconButton(
@@ -66,7 +62,7 @@ fun SectionGridScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                             contentDescription = "Back",
-                            tint = CinemaAlabaster
+                            tint = colors.alabaster
                         )
                     }
                 },
@@ -75,14 +71,14 @@ fun SectionGridScreen(
                         Text(
                             text = sectionTitle,
                             style = MaterialTheme.typography.headlineSmall,
-                            color = CinemaAlabaster,
+                            color = colors.alabaster,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = "${items.size} TITLES",
                             style = MaterialTheme.typography.labelSmall,
-                            color = CinemaGold
+                            color = colors.gold
                         )
                     }
                 }
@@ -96,15 +92,15 @@ fun SectionGridScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp),
             modifier = Modifier
                 .fillMaxSize()
-                .background(CinemaObsidian)
+                .background(colors.obsidian)
                 .padding(innerPadding)
         ) {
             items(items, key = { "grid_${it.id}" }) { item ->
                 val vaultEntry = vaultById[item.id]
                 Surface(
-                    color = CinemaSlate,
+                    color = colors.slate,
                     shape = RoundedCornerShape(16.dp),
-                    border = BorderStroke(1.dp, CinemaBorderSubtle),
+                    border = BorderStroke(1.dp, colors.borderSubtle),
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(16.dp))
@@ -129,7 +125,7 @@ fun SectionGridScreen(
                         Text(
                             text = item.title,
                             style = MaterialTheme.typography.titleSmall,
-                            color = CinemaAlabaster,
+                            color = colors.alabaster,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -143,7 +139,7 @@ fun SectionGridScreen(
                                 }
                             },
                             style = MaterialTheme.typography.bodySmall,
-                            color = CinemaSilver,
+                            color = colors.silver,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )

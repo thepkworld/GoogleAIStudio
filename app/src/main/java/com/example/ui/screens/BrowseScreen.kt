@@ -91,6 +91,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -113,14 +114,7 @@ import com.example.ui.MediaFilter
 import com.example.ui.components.CinemaPosterArtwork
 import com.example.ui.components.EmptyVaultState
 import com.example.ui.components.RatingPill
-import com.example.ui.theme.CinemaAlabaster
-import com.example.ui.theme.CinemaBorderSubtle
-import com.example.ui.theme.CinemaEmerald
-import com.example.ui.theme.CinemaGold
-import com.example.ui.theme.CinemaObsidian
-import com.example.ui.theme.CinemaSilver
-import com.example.ui.theme.CinemaSlate
-import com.example.ui.theme.CinemaSlateElevated
+import com.example.ui.theme.CinemaTheme
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -146,6 +140,7 @@ fun BrowseScreen(
     onCollectionClick: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = CinemaTheme.colors
     val catalogTitles = browseState.sectionTitles
     val listState = rememberLazyListState()
     val searchFocusRequester = remember { FocusRequester() }
@@ -204,9 +199,9 @@ fun BrowseScreen(
             if (!browseState.keyConfigured || browseState.errorMessage != null) {
                 item(key = "tmdb_notice") {
                     Surface(
-                        color = CinemaSlate,
+                        color = colors.slate,
                         shape = RoundedCornerShape(14.dp),
-                        border = BorderStroke(1.dp, CinemaGold.copy(alpha = 0.35f)),
+                        border = BorderStroke(1.dp, colors.gold.copy(alpha = 0.35f)),
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp)
@@ -221,14 +216,14 @@ fun BrowseScreen(
                             Icon(
                                 imageVector = Icons.Rounded.Info,
                                 contentDescription = null,
-                                tint = CinemaGold,
+                                tint = colors.gold,
                                 modifier = Modifier.size(18.dp)
                             )
                             Text(
                                 text = browseState.errorMessage
                                     ?: "Curated catalog active. Add TMDB_API_KEY in AI Studio Secrets for live TMDB discovery.",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = CinemaSilver,
+                                color = colors.silver,
                                 modifier = Modifier.weight(1f)
                             )
                             IconButton(
@@ -238,7 +233,7 @@ fun BrowseScreen(
                                 Icon(
                                     imageVector = Icons.Rounded.Refresh,
                                     contentDescription = "Retry TMDB sync",
-                                    tint = CinemaGold,
+                                    tint = colors.gold,
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
@@ -263,7 +258,7 @@ fun BrowseScreen(
                                 } else {
                                     "Search movies, series, directors, cast…"
                                 },
-                                color = CinemaSilver.copy(alpha = 0.7f),
+                                color = colors.silver.copy(alpha = 0.7f),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -272,7 +267,7 @@ fun BrowseScreen(
                             Icon(
                                 imageVector = Icons.Rounded.Search,
                                 contentDescription = "Search",
-                                tint = CinemaGold
+                                tint = colors.gold
                             )
                         },
                         trailingIcon = {
@@ -281,7 +276,7 @@ fun BrowseScreen(
                                     Icon(
                                         imageVector = Icons.Rounded.Clear,
                                         contentDescription = "Clear search",
-                                        tint = CinemaSilver
+                                        tint = colors.silver
                                     )
                                 }
                             }
@@ -289,13 +284,13 @@ fun BrowseScreen(
                         singleLine = true,
                         shape = RoundedCornerShape(16.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = CinemaGold,
-                            unfocusedBorderColor = CinemaBorderSubtle,
-                            focusedContainerColor = CinemaSlate,
-                            unfocusedContainerColor = CinemaSlate,
-                            focusedTextColor = CinemaAlabaster,
-                            unfocusedTextColor = CinemaAlabaster,
-                            cursorColor = CinemaGold
+                            focusedBorderColor = colors.gold,
+                            unfocusedBorderColor = colors.borderSubtle,
+                            focusedContainerColor = colors.slate,
+                            unfocusedContainerColor = colors.slate,
+                            focusedTextColor = colors.alabaster,
+                            unfocusedTextColor = colors.alabaster,
+                            cursorColor = colors.gold
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
@@ -334,7 +329,7 @@ fun BrowseScreen(
                                 modifier = Modifier
                                     .width(240.dp)
                                     .heightIn(max = 360.dp)
-                                    .background(CinemaSlateElevated)
+                                    .background(colors.slateElevated)
                             ) {
                                 DropdownMenuItem(
                                     text = {
@@ -346,14 +341,14 @@ fun BrowseScreen(
                                             Text(
                                                 text = "All Genres",
                                                 style = MaterialTheme.typography.labelLarge,
-                                                color = if (browseState.selectedGenres.isEmpty()) CinemaGold else CinemaAlabaster,
+                                                color = if (browseState.selectedGenres.isEmpty()) colors.gold else colors.alabaster,
                                                 fontWeight = FontWeight.Bold
                                             )
                                             if (browseState.selectedGenres.isNotEmpty()) {
                                                 Text(
                                                     text = "Clear",
                                                     style = MaterialTheme.typography.labelSmall,
-                                                    color = CinemaGold
+                                                    color = colors.gold
                                                 )
                                             }
                                         }
@@ -363,7 +358,7 @@ fun BrowseScreen(
                                         showGenreDropdown = false
                                     }
                                 )
-                                HorizontalDivider(color = CinemaBorderSubtle)
+                                HorizontalDivider(color = colors.borderSubtle)
                                 availableGenres.forEach { (genreId, genreName) ->
                                     val checked = browseState.selectedGenres.any {
                                         it.equals(genreName, ignoreCase = true)
@@ -378,15 +373,15 @@ fun BrowseScreen(
                                                     checked = checked,
                                                     onCheckedChange = null,
                                                     colors = CheckboxDefaults.colors(
-                                                        checkedColor = CinemaGold,
-                                                        uncheckedColor = CinemaSilver,
-                                                        checkmarkColor = CinemaObsidian
+                                                        checkedColor = colors.gold,
+                                                        uncheckedColor = colors.silver,
+                                                        checkmarkColor = colors.onGold
                                                     )
                                                 )
                                                 Text(
                                                     text = genreName,
                                                     style = MaterialTheme.typography.bodyMedium,
-                                                    color = if (checked) CinemaGold else CinemaAlabaster,
+                                                    color = if (checked) colors.gold else colors.alabaster,
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
@@ -424,12 +419,12 @@ fun BrowseScreen(
                                 onDismissRequest = { showSortDropdown = false },
                                 modifier = Modifier
                                     .width(236.dp)
-                                    .background(CinemaSlateElevated)
+                                    .background(colors.slateElevated)
                             ) {
                                 Text(
                                     text = "SORT ORDER",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = CinemaSilver,
+                                    color = colors.silver,
                                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
                                 )
                                 DiscoverSort.entries.forEach { sort ->
@@ -444,14 +439,14 @@ fun BrowseScreen(
                                                 Text(
                                                     text = sort.label,
                                                     style = MaterialTheme.typography.bodyMedium,
-                                                    color = if (selected) CinemaGold else CinemaAlabaster,
+                                                    color = if (selected) colors.gold else colors.alabaster,
                                                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
                                                 )
                                                 if (selected) {
                                                     Icon(
                                                         imageVector = Icons.Rounded.Check,
                                                         contentDescription = null,
-                                                        tint = CinemaGold,
+                                                        tint = colors.gold,
                                                         modifier = Modifier.size(16.dp)
                                                     )
                                                 }
@@ -464,12 +459,15 @@ fun BrowseScreen(
                                     )
                                 }
 
-                                HorizontalDivider(color = CinemaBorderSubtle, modifier = Modifier.padding(vertical = 4.dp))
+                                HorizontalDivider(
+                                    color = colors.borderSubtle,
+                                    modifier = Modifier.padding(vertical = 4.dp)
+                                )
 
                                 Text(
                                     text = "TYPE",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = CinemaSilver,
+                                    color = colors.silver,
                                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
                                 )
                                 MediaFilter.entries.forEach { mediaFilter ->
@@ -484,14 +482,14 @@ fun BrowseScreen(
                                                 Text(
                                                     text = mediaFilter.label,
                                                     style = MaterialTheme.typography.bodyMedium,
-                                                    color = if (selected) CinemaEmerald else CinemaAlabaster,
+                                                    color = if (selected) colors.emerald else colors.alabaster,
                                                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
                                                 )
                                                 if (selected) {
                                                     Icon(
                                                         imageVector = Icons.Rounded.Check,
                                                         contentDescription = null,
-                                                        tint = CinemaEmerald,
+                                                        tint = colors.emerald,
                                                         modifier = Modifier.size(16.dp)
                                                     )
                                                 }
@@ -506,13 +504,13 @@ fun BrowseScreen(
 
                                 if (searchQuery.isNotBlank() && browseState.isLiveTmdb) {
                                     HorizontalDivider(
-                                        color = CinemaBorderSubtle,
+                                        color = colors.borderSubtle,
                                         modifier = Modifier.padding(vertical = 4.dp)
                                     )
                                     Text(
                                         text = "SEARCH TARGET",
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = CinemaSilver,
+                                        color = colors.silver,
                                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
                                     )
                                     listOf(SearchScope.PEOPLE, SearchScope.COLLECTIONS).forEach { scope ->
@@ -527,13 +525,13 @@ fun BrowseScreen(
                                                     Text(
                                                         text = scope.label,
                                                         style = MaterialTheme.typography.bodyMedium,
-                                                        color = if (selected) CinemaGold else CinemaAlabaster
+                                                        color = if (selected) colors.gold else colors.alabaster
                                                     )
                                                     if (selected) {
                                                         Icon(
                                                             imageVector = Icons.Rounded.Check,
                                                             contentDescription = null,
-                                                            tint = CinemaGold,
+                                                            tint = colors.gold,
                                                             modifier = Modifier.size(16.dp)
                                                         )
                                                     }
@@ -566,8 +564,8 @@ fun BrowseScreen(
             if (browseState.isLoading) {
                 item(key = "loading_indicator") {
                     LinearProgressIndicator(
-                        color = CinemaGold,
-                        trackColor = CinemaSlateElevated,
+                        color = colors.gold,
+                        trackColor = colors.slateElevated,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp)
@@ -639,7 +637,7 @@ fun BrowseScreen(
                         Text(
                             text = heading,
                             style = MaterialTheme.typography.headlineMedium,
-                            color = CinemaAlabaster,
+                            color = colors.alabaster,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f)
@@ -648,7 +646,7 @@ fun BrowseScreen(
                         Text(
                             text = "${catalogTitles.size} TITLES",
                             style = MaterialTheme.typography.labelMedium,
-                            color = CinemaGold
+                            color = colors.gold
                         )
                     }
                 }
@@ -736,14 +734,14 @@ fun BrowseScreen(
                     ) {
                         if (browseState.isLoadingMore) {
                             CircularProgressIndicator(
-                                color = CinemaGold,
+                                color = colors.gold,
                                 modifier = Modifier.size(32.dp)
                             )
                         } else {
                             OutlinedButton(
                                 onClick = onLoadMore,
                                 shape = RoundedCornerShape(14.dp),
-                                border = BorderStroke(1.dp, CinemaGold.copy(alpha = 0.6f)),
+                                border = BorderStroke(1.dp, colors.gold.copy(alpha = 0.6f)),
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(48.dp)
@@ -751,7 +749,7 @@ fun BrowseScreen(
                                 Text(
                                     text = "Load More (Page ${browseState.currentPage} of ${browseState.totalPages})",
                                     style = MaterialTheme.typography.labelLarge,
-                                    color = CinemaGold
+                                    color = colors.gold
                                 )
                             }
                         }
@@ -765,8 +763,8 @@ fun BrowseScreen(
         ModalBottomSheet(
             onDismissRequest = { showFilterSheet = false },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = CinemaSlate,
-            contentColor = CinemaAlabaster
+            containerColor = colors.slate,
+            contentColor = colors.alabaster
         ) {
             Column(
                 modifier = Modifier
@@ -788,12 +786,12 @@ fun BrowseScreen(
                         Icon(
                             imageVector = Icons.Rounded.Tune,
                             contentDescription = null,
-                            tint = CinemaGold
+                            tint = colors.gold
                         )
                         Text(
                             text = "Genre + Sort",
                             style = MaterialTheme.typography.headlineSmall,
-                            color = CinemaAlabaster
+                            color = colors.alabaster
                         )
                     }
                     if (browseState.selectedGenres.isNotEmpty() ||
@@ -807,7 +805,7 @@ fun BrowseScreen(
                                 onMediaFilterChange(MediaFilter.ALL)
                             }
                         ) {
-                            Text("Reset All", color = CinemaGold)
+                            Text("Reset All", color = colors.gold)
                         }
                     }
                 }
@@ -817,7 +815,7 @@ fun BrowseScreen(
                     Text(
                         text = "TYPE",
                         style = MaterialTheme.typography.labelSmall,
-                        color = CinemaSilver
+                        color = colors.silver
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         MediaFilter.entries.forEach { mediaFilter ->
@@ -827,10 +825,10 @@ fun BrowseScreen(
                                 onClick = { onMediaFilterChange(mediaFilter) },
                                 label = { Text(mediaFilter.label) },
                                 colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = CinemaGold,
-                                    selectedLabelColor = CinemaObsidian,
-                                    containerColor = CinemaSlateElevated,
-                                    labelColor = CinemaSilver
+                                    selectedContainerColor = colors.gold,
+                                    selectedLabelColor = colors.onGold,
+                                    containerColor = colors.slateElevated,
+                                    labelColor = colors.silver
                                 )
                             )
                         }
@@ -842,7 +840,7 @@ fun BrowseScreen(
                     Text(
                         text = "SORT BY",
                         style = MaterialTheme.typography.labelSmall,
-                        color = CinemaSilver
+                        color = colors.silver
                     )
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -855,10 +853,10 @@ fun BrowseScreen(
                                 onClick = { onDiscoverSortSelect(sort) },
                                 label = { Text(sort.label) },
                                 colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = CinemaEmerald,
-                                    selectedLabelColor = CinemaObsidian,
-                                    containerColor = CinemaSlateElevated,
-                                    labelColor = CinemaSilver
+                                    selectedContainerColor = colors.emerald,
+                                    selectedLabelColor = if (colors.isDark) colors.obsidian else colors.onGold,
+                                    containerColor = colors.slateElevated,
+                                    labelColor = colors.silver
                                 )
                             )
                         }
@@ -875,13 +873,13 @@ fun BrowseScreen(
                         Text(
                             text = "GENRES (MULTI-SELECT)",
                             style = MaterialTheme.typography.labelSmall,
-                            color = CinemaSilver
+                            color = colors.silver
                         )
                         if (browseState.selectedGenres.isNotEmpty()) {
                             Text(
                                 text = "${browseState.selectedGenres.size} selected",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = CinemaGold
+                                color = colors.gold
                             )
                         }
                     }
@@ -907,17 +905,17 @@ fun BrowseScreen(
                                     }
                                 } else null,
                                 colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = CinemaGold.copy(alpha = 0.20f),
-                                    selectedLabelColor = CinemaGold,
-                                    selectedLeadingIconColor = CinemaGold,
-                                    containerColor = CinemaSlateElevated,
-                                    labelColor = CinemaSilver
+                                    selectedContainerColor = colors.gold.copy(alpha = 0.20f),
+                                    selectedLabelColor = colors.gold,
+                                    selectedLeadingIconColor = colors.gold,
+                                    containerColor = colors.slateElevated,
+                                    labelColor = colors.silver
                                 ),
                                 border = FilterChipDefaults.filterChipBorder(
                                     enabled = true,
                                     selected = selected,
-                                    borderColor = CinemaBorderSubtle,
-                                    selectedBorderColor = CinemaGold
+                                    borderColor = colors.borderSubtle,
+                                    selectedBorderColor = colors.gold
                                 )
                             )
                         }
@@ -928,8 +926,8 @@ fun BrowseScreen(
                     onClick = { showFilterSheet = false },
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = CinemaGold,
-                        contentColor = CinemaObsidian
+                        containerColor = colors.gold,
+                        contentColor = colors.onGold
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -949,21 +947,22 @@ fun BrowseScreen(
 @Composable
 private fun DropdownTriggerButton(
     label: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     isActive: Boolean,
     isExpanded: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = CinemaTheme.colors
     val arrowRotation by animateFloatAsState(
         targetValue = if (isExpanded) 180f else 0f,
         animationSpec = spring(),
         label = "dropdown_chevron"
     )
     Surface(
-        color = if (isActive) CinemaGold.copy(alpha = 0.14f) else CinemaSlate,
+        color = if (isActive) colors.gold.copy(alpha = 0.14f) else colors.slate,
         shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, if (isActive) CinemaGold else CinemaBorderSubtle),
+        border = BorderStroke(1.dp, if (isActive) colors.gold else colors.borderSubtle),
         modifier = modifier
             .height(48.dp)
             .clip(RoundedCornerShape(12.dp))
@@ -984,13 +983,13 @@ private fun DropdownTriggerButton(
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = if (isActive) CinemaGold else CinemaSilver,
+                    tint = if (isActive) colors.gold else colors.silver,
                     modifier = Modifier.size(16.dp)
                 )
                 Text(
                     text = label,
                     style = MaterialTheme.typography.labelLarge,
-                    color = if (isActive) CinemaGold else CinemaAlabaster,
+                    color = if (isActive) colors.gold else colors.alabaster,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -998,7 +997,7 @@ private fun DropdownTriggerButton(
             Icon(
                 imageVector = Icons.Rounded.KeyboardArrowDown,
                 contentDescription = null,
-                tint = if (isActive) CinemaGold else CinemaSilver,
+                tint = if (isActive) colors.gold else colors.silver,
                 modifier = Modifier
                     .size(18.dp)
                     .graphicsLayer { rotationZ = arrowRotation }
@@ -1013,15 +1012,11 @@ private fun ViewModeCycleButton(
     onCycle: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val icon = when (mode) {
-        CatalogViewMode.GRID -> Icons.Rounded.GridView
-        CatalogViewMode.LIST -> Icons.AutoMirrored.Rounded.ViewList
-        CatalogViewMode.COMPACT -> Icons.Rounded.ViewAgenda
-    }
+    val colors = CinemaTheme.colors
     Surface(
-        color = CinemaSlate,
+        color = colors.slate,
         shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, CinemaBorderSubtle),
+        border = BorderStroke(1.dp, colors.borderSubtle),
         modifier = modifier
             .height(48.dp)
             .clip(RoundedCornerShape(12.dp))
@@ -1044,13 +1039,13 @@ private fun ViewModeCycleButton(
                         CatalogViewMode.COMPACT -> Icons.Rounded.ViewAgenda
                     },
                     contentDescription = "Switch layout: ${currentMode.label}",
-                    tint = CinemaGold,
+                    tint = colors.gold,
                     modifier = Modifier.size(18.dp)
                 )
                 Text(
                     text = currentMode.label,
                     style = MaterialTheme.typography.labelMedium,
-                    color = CinemaAlabaster
+                    color = colors.alabaster
                 )
             }
         }
@@ -1059,6 +1054,7 @@ private fun ViewModeCycleButton(
 
 @Composable
 private fun SearchSkeletonRow(modifier: Modifier = Modifier) {
+    val colors = CinemaTheme.colors
     val transition = rememberInfiniteTransition(label = "search_skeleton")
     val alpha by transition.animateFloat(
         initialValue = 0.35f,
@@ -1070,9 +1066,9 @@ private fun SearchSkeletonRow(modifier: Modifier = Modifier) {
         label = "search_skeleton_alpha"
     )
     Surface(
-        color = CinemaSlate.copy(alpha = alpha),
+        color = colors.slate.copy(alpha = alpha),
         shape = RoundedCornerShape(18.dp),
-        border = BorderStroke(1.dp, CinemaBorderSubtle),
+        border = BorderStroke(1.dp, colors.borderSubtle),
         modifier = modifier
             .fillMaxWidth()
             .height(112.dp)
@@ -1085,10 +1081,11 @@ private fun PersonSearchCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = CinemaTheme.colors
     Surface(
-        color = CinemaSlate,
+        color = colors.slate,
         shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, CinemaBorderSubtle),
+        border = BorderStroke(1.dp, colors.borderSubtle),
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
@@ -1109,20 +1106,20 @@ private fun PersonSearchCard(
                     modifier = Modifier
                         .size(64.dp)
                         .clip(CircleShape)
-                        .background(CinemaSlateElevated)
+                        .background(colors.slateElevated)
                 )
             } else {
                 Box(
                     modifier = Modifier
                         .size(64.dp)
                         .clip(CircleShape)
-                        .background(CinemaSlateElevated),
+                        .background(colors.slateElevated),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.Person,
                         contentDescription = null,
-                        tint = CinemaGold
+                        tint = colors.gold
                     )
                 }
             }
@@ -1134,18 +1131,18 @@ private fun PersonSearchCard(
                 Text(
                     text = person.name,
                     style = MaterialTheme.typography.titleLarge,
-                    color = CinemaAlabaster
+                    color = colors.alabaster
                 )
                 Text(
                     text = person.knownForDepartment,
                     style = MaterialTheme.typography.labelMedium,
-                    color = CinemaGold
+                    color = colors.gold
                 )
                 if (person.knownForTitles.isNotBlank()) {
                     Text(
                         text = "Known for: ${person.knownForTitles}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = CinemaSilver,
+                        color = colors.silver,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -1161,10 +1158,11 @@ private fun CollectionSearchCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = CinemaTheme.colors
     Surface(
-        color = CinemaSlate,
+        color = colors.slate,
         shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, CinemaGold.copy(alpha = 0.25f)),
+        border = BorderStroke(1.dp, colors.gold.copy(alpha = 0.25f)),
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
@@ -1192,17 +1190,17 @@ private fun CollectionSearchCard(
                 Text(
                     text = "FRANCHISE COLLECTION",
                     style = MaterialTheme.typography.labelSmall,
-                    color = CinemaGold
+                    color = colors.gold
                 )
                 Text(
                     text = collection.name,
                     style = MaterialTheme.typography.titleLarge,
-                    color = CinemaAlabaster
+                    color = colors.alabaster
                 )
                 Text(
                     text = "Tap to explore all films in this collection",
                     style = MaterialTheme.typography.bodySmall,
-                    color = CinemaSilver
+                    color = colors.silver
                 )
             }
         }
@@ -1216,6 +1214,7 @@ private fun CatalogGridCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = CinemaTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
@@ -1225,9 +1224,9 @@ private fun CatalogGridCard(
     )
 
     Surface(
-        color = CinemaSlate,
+        color = colors.slate,
         shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, CinemaBorderSubtle),
+        border = BorderStroke(1.dp, colors.borderSubtle),
         modifier = modifier
             .graphicsLayer {
                 scaleX = scale
@@ -1259,7 +1258,7 @@ private fun CatalogGridCard(
             Text(
                 text = item.title,
                 style = MaterialTheme.typography.titleSmall,
-                color = CinemaAlabaster,
+                color = colors.alabaster,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -1273,7 +1272,7 @@ private fun CatalogGridCard(
                     }
                 },
                 style = MaterialTheme.typography.bodySmall,
-                color = CinemaSilver,
+                color = colors.silver,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -1288,10 +1287,11 @@ private fun CatalogListCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = CinemaTheme.colors
     Surface(
-        color = CinemaSlate,
+        color = colors.slate,
         shape = RoundedCornerShape(18.dp),
-        border = BorderStroke(1.dp, CinemaBorderSubtle),
+        border = BorderStroke(1.dp, colors.borderSubtle),
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
@@ -1339,14 +1339,14 @@ private fun CatalogListCard(
                             }
                         },
                         style = MaterialTheme.typography.labelMedium,
-                        color = CinemaSilver
+                        color = colors.silver
                     )
                 }
 
                 Text(
                     text = item.title,
                     style = MaterialTheme.typography.titleLarge,
-                    color = CinemaAlabaster,
+                    color = colors.alabaster,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -1356,7 +1356,7 @@ private fun CatalogListCard(
                         .filter { it.isNotBlank() }
                         .joinToString(" · "),
                     style = MaterialTheme.typography.bodySmall,
-                    color = CinemaSilver,
+                    color = colors.silver,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -1364,7 +1364,7 @@ private fun CatalogListCard(
                 Text(
                     text = item.genres.joinToString(" · "),
                     style = MaterialTheme.typography.labelSmall,
-                    color = CinemaGold.copy(alpha = 0.85f),
+                    color = colors.gold.copy(alpha = 0.85f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -1380,10 +1380,11 @@ private fun CatalogCompactCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = CinemaTheme.colors
     Surface(
-        color = CinemaSlate,
+        color = colors.slate,
         shape = RoundedCornerShape(14.dp),
-        border = BorderStroke(1.dp, CinemaBorderSubtle),
+        border = BorderStroke(1.dp, colors.borderSubtle),
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
@@ -1419,7 +1420,7 @@ private fun CatalogCompactCard(
                 Text(
                     text = item.title,
                     style = MaterialTheme.typography.titleMedium,
-                    color = CinemaAlabaster,
+                    color = colors.alabaster,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -1432,7 +1433,7 @@ private fun CatalogCompactCard(
                         }
                     },
                     style = MaterialTheme.typography.bodySmall,
-                    color = CinemaSilver,
+                    color = colors.silver,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )

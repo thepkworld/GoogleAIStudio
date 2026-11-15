@@ -13,6 +13,10 @@
           "type": "string",
           "description": "Reference ID of the curated catalog item or custom entry."
         },
+        "tmdbId": {
+          "type": ["integer", "null"],
+          "description": "Optional numeric TMDB identifier."
+        },
         "title": {
           "type": "string",
           "description": "Movie or series title."
@@ -54,6 +58,30 @@
         "posterKey": {
           "type": "string",
           "description": "Visual theme or bundled artwork key."
+        },
+        "posterUrl": {
+          "type": "string",
+          "description": "Optional remote poster URL."
+        },
+        "backdropUrl": {
+          "type": "string",
+          "description": "Optional remote backdrop URL."
+        },
+        "releaseDate": {
+          "type": "string",
+          "description": "Optional ISO release date (yyyy-MM-dd)."
+        },
+        "language": {
+          "type": "string",
+          "description": "Primary language label."
+        },
+        "studioOrNetwork": {
+          "type": "string",
+          "description": "Studio, OTT provider, or network name."
+        },
+        "watchedAt": {
+          "type": "integer",
+          "description": "User-selected watched date in epoch milliseconds (0 if unwatched)."
         },
         "userRating": {
           "type": "number",

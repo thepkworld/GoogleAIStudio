@@ -72,17 +72,7 @@ import com.example.ui.ActivityBucket
 import com.example.ui.DetailedStats
 import com.example.ui.GenreStat
 import com.example.ui.components.EmptyVaultState
-import com.example.ui.theme.CinemaAlabaster
-import com.example.ui.theme.CinemaAsh
-import com.example.ui.theme.CinemaBorderSubtle
-import com.example.ui.theme.CinemaCrimson
-import com.example.ui.theme.CinemaEmerald
-import com.example.ui.theme.CinemaGold
-import com.example.ui.theme.CinemaIndigo
-import com.example.ui.theme.CinemaObsidian
-import com.example.ui.theme.CinemaSilver
-import com.example.ui.theme.CinemaSlate
-import com.example.ui.theme.CinemaSlateElevated
+import com.example.ui.theme.CinemaTheme
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -103,6 +93,7 @@ fun StatsScreen(
     onBrowseClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = CinemaTheme.colors
     var activityMode by remember { mutableStateOf(ActivityChartMode.MONTHLY) }
     var genreMode by remember { mutableStateOf(GenreViewMode.MOST_WATCHED) }
 
@@ -176,7 +167,7 @@ fun StatsScreen(
                     title = "Release Eras & Decades",
                     subtitle = "Distribution across cinema eras",
                     icon = Icons.Rounded.History,
-                    accentColor = CinemaIndigo,
+                    accentColor = colors.indigo,
                     items = stats.decadeBreakdown,
                     tag = "stats_decades_card"
                 )
@@ -192,7 +183,7 @@ fun StatsScreen(
                             title = "Languages Watched",
                             subtitle = "Original & spoken audio diversity",
                             icon = Icons.Rounded.Language,
-                            accentColor = CinemaEmerald,
+                            accentColor = colors.emerald,
                             items = stats.languageBreakdown,
                             tag = "stats_languages_card"
                         )
@@ -202,7 +193,7 @@ fun StatsScreen(
                             title = "OTT & Studio Footprint",
                             subtitle = "Networks, streamers & studios",
                             icon = Icons.Rounded.LiveTv,
-                            accentColor = CinemaGold,
+                            accentColor = colors.gold,
                             items = stats.platformBreakdown,
                             tag = "stats_platforms_card"
                         )
@@ -222,10 +213,11 @@ fun StatsScreen(
 
 @Composable
 private fun StatsHeroOverviewCard(stats: DetailedStats) {
+    val colors = CinemaTheme.colors
     Surface(
-        color = CinemaSlate,
+        color = colors.slate,
         shape = RoundedCornerShape(24.dp),
-        border = BorderStroke(1.dp, CinemaGold.copy(alpha = 0.30f)),
+        border = BorderStroke(1.dp, colors.gold.copy(alpha = 0.30f)),
         modifier = Modifier
             .fillMaxWidth()
             .testTag("stats_hero_card")
@@ -235,7 +227,7 @@ private fun StatsHeroOverviewCard(stats: DetailedStats) {
                 .fillMaxWidth()
                 .background(
                     Brush.verticalGradient(
-                        0f to CinemaGold.copy(alpha = 0.09f),
+                        0f to colors.gold.copy(alpha = 0.09f),
                         1f to Color.Transparent
                     )
                 )
@@ -251,20 +243,20 @@ private fun StatsHeroOverviewCard(stats: DetailedStats) {
                     Text(
                         text = "CINEMA INTELLIGENCE",
                         style = MaterialTheme.typography.labelMedium,
-                        color = CinemaGold,
+                        color = colors.gold,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = "Viewing Overview",
                         style = MaterialTheme.typography.headlineSmall,
-                        color = CinemaAlabaster
+                        color = colors.alabaster
                     )
                 }
                 if (stats.averageRating > 0.0) {
                     Surface(
-                        color = CinemaGold.copy(alpha = 0.16f),
+                        color = colors.gold.copy(alpha = 0.16f),
                         shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, CinemaGold.copy(alpha = 0.40f))
+                        border = BorderStroke(1.dp, colors.gold.copy(alpha = 0.40f))
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
@@ -273,14 +265,14 @@ private fun StatsHeroOverviewCard(stats: DetailedStats) {
                             Icon(
                                 imageVector = Icons.Rounded.Star,
                                 contentDescription = null,
-                                tint = CinemaGold,
+                                tint = colors.gold,
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = "${String.format(Locale.US, "%.1f", stats.averageRating)} AVG",
                                 style = MaterialTheme.typography.labelMedium,
-                                color = CinemaGold,
+                                color = colors.gold,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -297,7 +289,7 @@ private fun StatsHeroOverviewCard(stats: DetailedStats) {
                     label = "WATCHED",
                     value = "${stats.totalWatched}",
                     caption = "${stats.watchedMovies}M · ${stats.watchedSeries}S",
-                    accentColor = CinemaEmerald,
+                    accentColor = colors.emerald,
                     icon = Icons.Rounded.CheckCircle,
                     modifier = Modifier
                         .weight(1f)
@@ -307,7 +299,7 @@ private fun StatsHeroOverviewCard(stats: DetailedStats) {
                     label = "BUCKETLIST",
                     value = "${stats.totalBucketlist}",
                     caption = "${stats.priorityBucketlist} Up Next",
-                    accentColor = CinemaGold,
+                    accentColor = colors.gold,
                     icon = Icons.Rounded.Bookmark,
                     modifier = Modifier
                         .weight(1f)
@@ -317,19 +309,19 @@ private fun StatsHeroOverviewCard(stats: DetailedStats) {
                     label = "THIS MONTH",
                     value = "${stats.watchedThisMonth}",
                     caption = stats.currentMonthLabel,
-                    accentColor = CinemaIndigo,
+                    accentColor = colors.indigo,
                     icon = Icons.Rounded.CalendarMonth,
                     modifier = Modifier.weight(1f)
                 )
             }
 
-            HorizontalDivider(color = CinemaBorderSubtle)
+            HorizontalDivider(color = colors.borderSubtle)
 
             // Completion Rate Progress Rings
             Text(
                 text = "COMPLETION RATES",
                 style = MaterialTheme.typography.labelSmall,
-                color = CinemaSilver,
+                color = colors.silver,
                 fontWeight = FontWeight.SemiBold
             )
 
@@ -341,14 +333,14 @@ private fun StatsHeroOverviewCard(stats: DetailedStats) {
                     label = "Movies",
                     progress = stats.moviesCompletionRate,
                     detail = "${stats.watchedMovies}/${stats.watchedMovies + stats.bucketlistMovies}",
-                    color = CinemaGold,
+                    color = colors.gold,
                     modifier = Modifier.weight(1f)
                 )
                 CompletionRingItem(
                     label = "Series",
                     progress = stats.seriesCompletionRate,
                     detail = "${stats.watchedSeries}/${stats.watchedSeries + stats.bucketlistSeries}",
-                    color = CinemaEmerald,
+                    color = colors.emerald,
                     modifier = Modifier.weight(1f)
                 )
                 CompletionRingItem(
@@ -359,7 +351,7 @@ private fun StatsHeroOverviewCard(stats: DetailedStats) {
                     } else {
                         "${stats.totalEpisodesWatched} ep"
                     },
-                    color = CinemaIndigo,
+                    color = colors.indigo,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -376,8 +368,9 @@ private fun MetricTile(
     icon: ImageVector,
     modifier: Modifier = Modifier
 ) {
+    val colors = CinemaTheme.colors
     Surface(
-        color = CinemaObsidian.copy(alpha = 0.65f),
+        color = colors.obsidian.copy(alpha = 0.65f),
         shape = RoundedCornerShape(16.dp),
         border = BorderStroke(1.dp, accentColor.copy(alpha = 0.25f)),
         modifier = modifier
@@ -399,7 +392,7 @@ private fun MetricTile(
                 Text(
                     text = label,
                     style = MaterialTheme.typography.labelSmall,
-                    color = CinemaSilver,
+                    color = colors.silver,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -413,7 +406,7 @@ private fun MetricTile(
             Text(
                 text = caption,
                 style = MaterialTheme.typography.labelSmall,
-                color = CinemaAlabaster.copy(alpha = 0.78f),
+                color = colors.alabaster.copy(alpha = 0.78f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -429,6 +422,7 @@ private fun CompletionRingItem(
     color: Color,
     modifier: Modifier = Modifier
 ) {
+    val colors = CinemaTheme.colors
     val animatedProgress by animateFloatAsState(
         targetValue = progress.coerceIn(0f, 1f),
         animationSpec = tween(durationMillis = 700),
@@ -445,13 +439,14 @@ private fun CompletionRingItem(
             modifier = Modifier.size(76.dp),
             contentAlignment = Alignment.Center
         ) {
+            val trackColor = colors.slateElevated
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val strokeWidth = 8.dp.toPx()
                 val arcSize = Size(size.width - strokeWidth, size.height - strokeWidth)
                 val topLeft = Offset(strokeWidth / 2f, strokeWidth / 2f)
 
                 drawArc(
-                    color = CinemaSlateElevated,
+                    color = trackColor,
                     startAngle = -90f,
                     sweepAngle = 360f,
                     useCenter = false,
@@ -474,20 +469,20 @@ private fun CompletionRingItem(
             Text(
                 text = percentText,
                 style = MaterialTheme.typography.titleSmall,
-                color = CinemaAlabaster,
+                color = colors.alabaster,
                 fontWeight = FontWeight.Bold
             )
         }
         Text(
             text = label,
             style = MaterialTheme.typography.labelMedium,
-            color = CinemaAlabaster,
+            color = colors.alabaster,
             fontWeight = FontWeight.SemiBold
         )
         Text(
             text = detail,
             style = MaterialTheme.typography.labelSmall,
-            color = CinemaSilver
+            color = colors.silver
         )
     }
 }
@@ -495,13 +490,14 @@ private fun CompletionRingItem(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun WatchTimeBreakdownCard(stats: DetailedStats) {
+    val colors = CinemaTheme.colors
     val totalHrs = stats.totalHoursWatched.coerceAtLeast(0.0)
     val movieShare = if (totalHrs > 0.0) (stats.movieHoursWatched / totalHrs).toFloat().coerceIn(0f, 1f) else 0.5f
 
     Surface(
-        color = CinemaSlate,
+        color = colors.slate,
         shape = RoundedCornerShape(22.dp),
-        border = BorderStroke(1.dp, CinemaBorderSubtle),
+        border = BorderStroke(1.dp, colors.borderSubtle),
         modifier = Modifier
             .fillMaxWidth()
             .testTag("stats_watch_time_card")
@@ -524,19 +520,19 @@ private fun WatchTimeBreakdownCard(stats: DetailedStats) {
                     Icon(
                         imageVector = Icons.Rounded.Schedule,
                         contentDescription = null,
-                        tint = CinemaGold,
+                        tint = colors.gold,
                         modifier = Modifier.size(20.dp)
                     )
                     Text(
                         text = "Time Spent Watching",
                         style = MaterialTheme.typography.titleLarge,
-                        color = CinemaAlabaster
+                        color = colors.alabaster
                     )
                 }
                 Text(
                     text = String.format(Locale.US, "%.1f hrs", totalHrs),
                     style = MaterialTheme.typography.headlineSmall,
-                    color = CinemaGold,
+                    color = colors.gold,
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -547,7 +543,7 @@ private fun WatchTimeBreakdownCard(stats: DetailedStats) {
                     .fillMaxWidth()
                     .height(12.dp)
                     .clip(CircleShape)
-                    .background(CinemaSlateElevated)
+                    .background(colors.slateElevated)
             ) {
                 if (totalHrs > 0.0) {
                     Row(modifier = Modifier.fillMaxSize()) {
@@ -556,7 +552,7 @@ private fun WatchTimeBreakdownCard(stats: DetailedStats) {
                                 modifier = Modifier
                                     .fillMaxHeight()
                                     .weight(movieShare.coerceAtLeast(0.01f))
-                                    .background(CinemaGold)
+                                    .background(colors.gold)
                             )
                         }
                         if (1f - movieShare > 0f) {
@@ -564,7 +560,7 @@ private fun WatchTimeBreakdownCard(stats: DetailedStats) {
                                 modifier = Modifier
                                     .fillMaxHeight()
                                     .weight((1f - movieShare).coerceAtLeast(0.01f))
-                                    .background(CinemaEmerald)
+                                    .background(colors.emerald)
                             )
                         }
                     }
@@ -583,12 +579,12 @@ private fun WatchTimeBreakdownCard(stats: DetailedStats) {
                         modifier = Modifier
                             .size(10.dp)
                             .clip(CircleShape)
-                            .background(CinemaGold)
+                            .background(colors.gold)
                     )
                     Text(
                         text = "Movies: ${String.format(Locale.US, "%.1f", stats.movieHoursWatched)} hrs",
                         style = MaterialTheme.typography.bodySmall,
-                        color = CinemaAlabaster
+                        color = colors.alabaster
                     )
                 }
                 Row(
@@ -599,17 +595,17 @@ private fun WatchTimeBreakdownCard(stats: DetailedStats) {
                         modifier = Modifier
                             .size(10.dp)
                             .clip(CircleShape)
-                            .background(CinemaEmerald)
+                            .background(colors.emerald)
                     )
                     Text(
                         text = "Series: ${String.format(Locale.US, "%.1f", stats.seriesHoursWatched)} hrs",
                         style = MaterialTheme.typography.bodySmall,
-                        color = CinemaAlabaster
+                        color = colors.alabaster
                     )
                 }
             }
 
-            HorizontalDivider(color = CinemaBorderSubtle)
+            HorizontalDivider(color = colors.borderSubtle)
 
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
@@ -619,22 +615,22 @@ private fun WatchTimeBreakdownCard(stats: DetailedStats) {
                 MiniStatChip(
                     icon = Icons.Rounded.Tv,
                     label = "${stats.totalEpisodesWatched} Episodes",
-                    accentColor = CinemaIndigo
+                    accentColor = colors.indigo
                 )
                 MiniStatChip(
                     icon = Icons.Rounded.Repeat,
                     label = "${stats.totalRewatches} Rewatches",
-                    accentColor = CinemaEmerald
+                    accentColor = colors.emerald
                 )
                 MiniStatChip(
                     icon = Icons.Rounded.RateReview,
                     label = "${stats.totalReviews} Reviews",
-                    accentColor = CinemaGold
+                    accentColor = colors.gold
                 )
                 MiniStatChip(
                     icon = Icons.Rounded.Movie,
                     label = "${stats.watchedThisYear} This Year",
-                    accentColor = CinemaAlabaster
+                    accentColor = colors.alabaster
                 )
             }
         }
@@ -647,8 +643,9 @@ private fun MiniStatChip(
     label: String,
     accentColor: Color
 ) {
+    val colors = CinemaTheme.colors
     Surface(
-        color = CinemaObsidian.copy(alpha = 0.6f),
+        color = colors.obsidian.copy(alpha = 0.6f),
         shape = RoundedCornerShape(10.dp),
         border = BorderStroke(1.dp, accentColor.copy(alpha = 0.25f))
     ) {
@@ -666,7 +663,7 @@ private fun MiniStatChip(
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
-                color = CinemaAlabaster
+                color = colors.alabaster
             )
         }
     }
@@ -678,6 +675,7 @@ private fun WatchingActivityCard(
     mode: ActivityChartMode,
     onModeChange: (ActivityChartMode) -> Unit
 ) {
+    val colors = CinemaTheme.colors
     val buckets: List<ActivityBucket> = if (mode == ActivityChartMode.MONTHLY) {
         stats.monthlyActivity
     } else {
@@ -686,9 +684,9 @@ private fun WatchingActivityCard(
     val maxTotal = (buckets.maxOfOrNull { it.total } ?: 0).coerceAtLeast(1)
 
     Surface(
-        color = CinemaSlate,
+        color = colors.slate,
         shape = RoundedCornerShape(22.dp),
-        border = BorderStroke(1.dp, CinemaBorderSubtle),
+        border = BorderStroke(1.dp, colors.borderSubtle),
         modifier = Modifier
             .fillMaxWidth()
             .testTag("stats_activity_card")
@@ -708,7 +706,7 @@ private fun WatchingActivityCard(
                     Text(
                         text = "Watching Activity",
                         style = MaterialTheme.typography.titleLarge,
-                        color = CinemaAlabaster
+                        color = colors.alabaster
                     )
                     Text(
                         text = if (mode == ActivityChartMode.MONTHLY) {
@@ -717,7 +715,7 @@ private fun WatchingActivityCard(
                             "Last 5 years log"
                         },
                         style = MaterialTheme.typography.bodySmall,
-                        color = CinemaSilver
+                        color = colors.silver
                     )
                 }
 
@@ -752,7 +750,7 @@ private fun WatchingActivityCard(
                             Text(
                                 text = "${bucket.total}",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = CinemaGold,
+                                color = colors.gold,
                                 fontWeight = FontWeight.Bold
                             )
                             Spacer(modifier = Modifier.height(4.dp))
@@ -770,7 +768,7 @@ private fun WatchingActivityCard(
                                     .fillMaxWidth()
                                     .fillMaxHeight()
                                     .clip(RoundedCornerShape(8.dp))
-                                    .background(CinemaSlateElevated.copy(alpha = 0.45f))
+                                    .background(colors.slateElevated.copy(alpha = 0.45f))
                             )
                             if (bucket.total > 0) {
                                 Column(
@@ -785,7 +783,7 @@ private fun WatchingActivityCard(
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .weight(bucket.seriesCount.toFloat())
-                                                .background(CinemaEmerald)
+                                                .background(colors.emerald)
                                         )
                                     }
                                     if (bucket.moviesCount > 0) {
@@ -793,7 +791,7 @@ private fun WatchingActivityCard(
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .weight(bucket.moviesCount.toFloat())
-                                                .background(CinemaGold)
+                                                .background(colors.gold)
                                         )
                                     }
                                 }
@@ -804,7 +802,7 @@ private fun WatchingActivityCard(
                         Text(
                             text = bucket.label,
                             style = MaterialTheme.typography.labelSmall,
-                            color = CinemaSilver,
+                            color = colors.silver,
                             maxLines = 1
                         )
                     }
@@ -815,8 +813,8 @@ private fun WatchingActivityCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                LegendItem(color = CinemaGold, label = "Movies")
-                LegendItem(color = CinemaEmerald, label = "Series")
+                LegendItem(color = colors.gold, label = "Movies")
+                LegendItem(color = colors.emerald, label = "Series")
             }
         }
     }
@@ -824,12 +822,13 @@ private fun WatchingActivityCard(
 
 @Composable
 private fun RatingDistributionCard(stats: DetailedStats) {
+    val colors = CinemaTheme.colors
     val maxBucket = (stats.ratingDistribution1To10.maxOrNull() ?: 0).coerceAtLeast(1)
 
     Surface(
-        color = CinemaSlate,
+        color = colors.slate,
         shape = RoundedCornerShape(22.dp),
-        border = BorderStroke(1.dp, CinemaBorderSubtle),
+        border = BorderStroke(1.dp, colors.borderSubtle),
         modifier = Modifier
             .fillMaxWidth()
             .testTag("stats_rating_dist_card")
@@ -853,13 +852,13 @@ private fun RatingDistributionCard(stats: DetailedStats) {
                         Icon(
                             imageVector = Icons.Rounded.BarChart,
                             contentDescription = null,
-                            tint = CinemaGold,
+                            tint = colors.gold,
                             modifier = Modifier.size(20.dp)
                         )
                         Text(
                             text = "1–10 Rating Distribution",
                             style = MaterialTheme.typography.titleLarge,
-                            color = CinemaAlabaster
+                            color = colors.alabaster
                         )
                     }
                     Text(
@@ -869,7 +868,7 @@ private fun RatingDistributionCard(stats: DetailedStats) {
                             "Rate watched titles 1–10 to build your taste curve"
                         },
                         style = MaterialTheme.typography.bodySmall,
-                        color = CinemaSilver
+                        color = colors.silver
                     )
                 }
             }
@@ -885,10 +884,10 @@ private fun RatingDistributionCard(stats: DetailedStats) {
                 stats.ratingDistribution1To10.forEachIndexed { idx, count ->
                     val score = idx + 1
                     val barColor = when {
-                        score >= 9 -> CinemaGold
-                        score >= 7 -> CinemaEmerald
-                        score >= 5 -> CinemaAlabaster
-                        else -> CinemaCrimson
+                        score >= 9 -> colors.gold
+                        score >= 7 -> colors.emerald
+                        score >= 5 -> colors.alabaster
+                        else -> colors.crimson
                     }
                     val heightFraction = if (count > 0) {
                         (count.toFloat() / maxBucket.toFloat()).coerceIn(0.10f, 1f)
@@ -923,7 +922,7 @@ private fun RatingDistributionCard(stats: DetailedStats) {
                                     .fillMaxWidth(0.76f)
                                     .fillMaxHeight()
                                     .clip(RoundedCornerShape(6.dp))
-                                    .background(CinemaSlateElevated.copy(alpha = 0.40f))
+                                    .background(colors.slateElevated.copy(alpha = 0.40f))
                             )
                             if (count > 0) {
                                 Box(
@@ -940,7 +939,7 @@ private fun RatingDistributionCard(stats: DetailedStats) {
                         Text(
                             text = "$score",
                             style = MaterialTheme.typography.labelSmall,
-                            color = if (count > 0) barColor else CinemaAsh,
+                            color = if (count > 0) barColor else colors.ash,
                             fontWeight = if (count > 0) FontWeight.Bold else FontWeight.Normal
                         )
                     }
@@ -949,9 +948,9 @@ private fun RatingDistributionCard(stats: DetailedStats) {
 
             if (stats.averageRating > 0.0) {
                 Surface(
-                    color = CinemaObsidian.copy(alpha = 0.55f),
+                    color = colors.obsidian.copy(alpha = 0.55f),
                     shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, CinemaGold.copy(alpha = 0.22f)),
+                    border = BorderStroke(1.dp, colors.gold.copy(alpha = 0.22f)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
@@ -964,12 +963,12 @@ private fun RatingDistributionCard(stats: DetailedStats) {
                         Text(
                             text = "Average Score Verdict",
                             style = MaterialTheme.typography.labelMedium,
-                            color = CinemaSilver
+                            color = colors.silver
                         )
                         Text(
                             text = "${String.format(Locale.US, "%.1f", stats.averageRating)}/10 · ${RatingScale.labelFor(stats.averageRating)}",
                             style = MaterialTheme.typography.labelLarge,
-                            color = CinemaGold,
+                            color = colors.gold,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -986,13 +985,14 @@ private fun GenreAnalyticsCard(
     mode: GenreViewMode,
     onModeChange: (GenreViewMode) -> Unit
 ) {
+    val colors = CinemaTheme.colors
     val activeList = if (mode == GenreViewMode.MOST_WATCHED) mostWatched else topRated.ifEmpty { mostWatched }
     val maxCount = (mostWatched.maxOfOrNull { it.count } ?: 1).coerceAtLeast(1)
 
     Surface(
-        color = CinemaSlate,
+        color = colors.slate,
         shape = RoundedCornerShape(22.dp),
-        border = BorderStroke(1.dp, CinemaBorderSubtle),
+        border = BorderStroke(1.dp, colors.borderSubtle),
         modifier = Modifier
             .fillMaxWidth()
             .testTag("stats_genre_card")
@@ -1012,7 +1012,7 @@ private fun GenreAnalyticsCard(
                     Text(
                         text = "Genre Insights",
                         style = MaterialTheme.typography.titleLarge,
-                        color = CinemaAlabaster
+                        color = colors.alabaster
                     )
                     Text(
                         text = if (mode == GenreViewMode.MOST_WATCHED) {
@@ -1021,7 +1021,7 @@ private fun GenreAnalyticsCard(
                             "Highest average rating by genre"
                         },
                         style = MaterialTheme.typography.bodySmall,
-                        color = CinemaSilver
+                        color = colors.silver
                     )
                 }
 
@@ -1039,7 +1039,7 @@ private fun GenreAnalyticsCard(
                 } else {
                     (genre.averageRating.toFloat() / 10f).coerceIn(0.08f, 1f)
                 }
-                val barColor = if (mode == GenreViewMode.MOST_WATCHED) CinemaEmerald else CinemaGold
+                val barColor = if (mode == GenreViewMode.MOST_WATCHED) colors.emerald else colors.gold
 
                 Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     Row(
@@ -1050,7 +1050,7 @@ private fun GenreAnalyticsCard(
                         Text(
                             text = genre.name,
                             style = MaterialTheme.typography.titleSmall,
-                            color = CinemaAlabaster
+                            color = colors.alabaster
                         )
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1060,14 +1060,14 @@ private fun GenreAnalyticsCard(
                                 Text(
                                     text = "★ ${String.format(Locale.US, "%.1f", genre.averageRating)}",
                                     style = MaterialTheme.typography.labelMedium,
-                                    color = CinemaGold,
+                                    color = colors.gold,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
                             Text(
                                 text = "${genre.count} ${if (genre.count == 1) "title" else "titles"}",
                                 style = MaterialTheme.typography.labelMedium,
-                                color = CinemaSilver
+                                color = colors.silver
                             )
                         }
                     }
@@ -1077,7 +1077,7 @@ private fun GenreAnalyticsCard(
                             .fillMaxWidth()
                             .height(8.dp)
                             .clip(CircleShape)
-                            .background(CinemaSlateElevated)
+                            .background(colors.slateElevated)
                     ) {
                         Box(
                             modifier = Modifier
@@ -1102,12 +1102,13 @@ private fun HorizontalBarSectionCard(
     items: List<Pair<String, Int>>,
     tag: String
 ) {
+    val colors = CinemaTheme.colors
     val maxCount = (items.maxOfOrNull { it.second } ?: 1).coerceAtLeast(1)
 
     Surface(
-        color = CinemaSlate,
+        color = colors.slate,
         shape = RoundedCornerShape(22.dp),
-        border = BorderStroke(1.dp, CinemaBorderSubtle),
+        border = BorderStroke(1.dp, colors.borderSubtle),
         modifier = Modifier
             .fillMaxWidth()
             .testTag(tag)
@@ -1132,12 +1133,12 @@ private fun HorizontalBarSectionCard(
                     Text(
                         text = title,
                         style = MaterialTheme.typography.titleLarge,
-                        color = CinemaAlabaster
+                        color = colors.alabaster
                     )
                     Text(
                         text = subtitle,
                         style = MaterialTheme.typography.bodySmall,
-                        color = CinemaSilver
+                        color = colors.silver
                     )
                 }
             }
@@ -1156,7 +1157,7 @@ private fun HorizontalBarSectionCard(
                     Text(
                         text = label,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = CinemaAlabaster,
+                        color = colors.alabaster,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.width(104.dp)
@@ -1166,7 +1167,7 @@ private fun HorizontalBarSectionCard(
                             .weight(1f)
                             .height(9.dp)
                             .clip(CircleShape)
-                            .background(CinemaSlateElevated)
+                            .background(colors.slateElevated)
                     ) {
                         if (fraction > 0f) {
                             Box(
@@ -1181,7 +1182,7 @@ private fun HorizontalBarSectionCard(
                     Text(
                         text = "$count",
                         style = MaterialTheme.typography.labelLarge,
-                        color = if (count > 0) accentColor else CinemaAsh,
+                        color = if (count > 0) accentColor else colors.ash,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.End,
                         modifier = Modifier.width(28.dp)
@@ -1194,10 +1195,11 @@ private fun HorizontalBarSectionCard(
 
 @Composable
 private fun TopCreatorsCard(creators: List<Pair<String, Int>>) {
+    val colors = CinemaTheme.colors
     Surface(
-        color = CinemaSlate,
+        color = colors.slate,
         shape = RoundedCornerShape(22.dp),
-        border = BorderStroke(1.dp, CinemaBorderSubtle),
+        border = BorderStroke(1.dp, colors.borderSubtle),
         modifier = Modifier
             .fillMaxWidth()
             .testTag("stats_creators_card")
@@ -1215,21 +1217,21 @@ private fun TopCreatorsCard(creators: List<Pair<String, Int>>) {
                 Icon(
                     imageVector = Icons.Rounded.AutoAwesome,
                     contentDescription = null,
-                    tint = CinemaGold,
+                    tint = colors.gold,
                     modifier = Modifier.size(20.dp)
                 )
                 Text(
                     text = "Most Watched Directors & Creators",
                     style = MaterialTheme.typography.titleLarge,
-                    color = CinemaAlabaster
+                    color = colors.alabaster
                 )
             }
 
             creators.forEachIndexed { index, (name, count) ->
                 Surface(
-                    color = CinemaObsidian.copy(alpha = 0.55f),
+                    color = colors.obsidian.copy(alpha = 0.55f),
                     shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, CinemaBorderSubtle),
+                    border = BorderStroke(1.dp, colors.borderSubtle),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
@@ -1245,7 +1247,7 @@ private fun TopCreatorsCard(creators: List<Pair<String, Int>>) {
                             modifier = Modifier.weight(1f)
                         ) {
                             Surface(
-                                color = CinemaGold.copy(alpha = 0.16f),
+                                color = colors.gold.copy(alpha = 0.16f),
                                 shape = CircleShape,
                                 modifier = Modifier.size(26.dp)
                             ) {
@@ -1253,7 +1255,7 @@ private fun TopCreatorsCard(creators: List<Pair<String, Int>>) {
                                     Text(
                                         text = "${index + 1}",
                                         style = MaterialTheme.typography.labelMedium,
-                                        color = CinemaGold,
+                                        color = colors.gold,
                                         fontWeight = FontWeight.Bold
                                     )
                                 }
@@ -1261,13 +1263,13 @@ private fun TopCreatorsCard(creators: List<Pair<String, Int>>) {
                             Icon(
                                 imageVector = Icons.Rounded.Person,
                                 contentDescription = null,
-                                tint = CinemaSilver,
+                                tint = colors.silver,
                                 modifier = Modifier.size(16.dp)
                             )
                             Text(
                                 text = name,
                                 style = MaterialTheme.typography.titleSmall,
-                                color = CinemaAlabaster,
+                                color = colors.alabaster,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -1275,7 +1277,7 @@ private fun TopCreatorsCard(creators: List<Pair<String, Int>>) {
                         Text(
                             text = "$count ${if (count == 1) "title" else "titles"}",
                             style = MaterialTheme.typography.labelMedium,
-                            color = CinemaEmerald,
+                            color = colors.emerald,
                             fontWeight = FontWeight.SemiBold
                         )
                     }
@@ -1292,16 +1294,17 @@ private fun <T> SegmentedPillToggle(
     labelFor: (T) -> String,
     onSelect: (T) -> Unit
 ) {
+    val colors = CinemaTheme.colors
     Surface(
-        color = CinemaObsidian.copy(alpha = 0.7f),
+        color = colors.obsidian.copy(alpha = 0.7f),
         shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, CinemaBorderSubtle)
+        border = BorderStroke(1.dp, colors.borderSubtle)
     ) {
         Row(modifier = Modifier.padding(3.dp)) {
             options.forEach { option ->
                 val isSelected = option == selected
                 Surface(
-                    color = if (isSelected) CinemaGold else Color.Transparent,
+                    color = if (isSelected) colors.gold else Color.Transparent,
                     shape = RoundedCornerShape(9.dp),
                     modifier = Modifier
                         .heightIn(min = 36.dp)
@@ -1315,7 +1318,7 @@ private fun <T> SegmentedPillToggle(
                         Text(
                             text = labelFor(option),
                             style = MaterialTheme.typography.labelSmall,
-                            color = if (isSelected) CinemaObsidian else CinemaSilver,
+                            color = if (isSelected) colors.onGold else colors.silver,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -1327,6 +1330,7 @@ private fun <T> SegmentedPillToggle(
 
 @Composable
 private fun LegendItem(color: Color, label: String) {
+    val colors = CinemaTheme.colors
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -1340,7 +1344,7 @@ private fun LegendItem(color: Color, label: String) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
-            color = CinemaSilver
+            color = colors.silver
         )
     }
 }

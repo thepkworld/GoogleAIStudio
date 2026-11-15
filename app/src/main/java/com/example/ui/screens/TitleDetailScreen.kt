@@ -40,36 +40,28 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Assessment
 import androidx.compose.material.icons.rounded.Bookmark
-import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.CollectionsBookmark
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.EmojiEvents
-import androidx.compose.material.icons.rounded.FormatQuote
 import androidx.compose.material.icons.rounded.LiveTv
-import androidx.compose.material.icons.rounded.LocalFireDepartment
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.PushPin
-import androidx.compose.material.icons.rounded.RateReview
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.Today
-import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -77,8 +69,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -88,7 +78,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -109,21 +98,8 @@ import com.example.data.model.WatchStatus
 import com.example.ui.components.CinemaBackdropImage
 import com.example.ui.components.CinemaPosterArtwork
 import com.example.ui.components.RatingPill
-import com.example.ui.components.TenStarRatingBar
-import com.example.ui.components.WatchedDatePickerDialog
 import com.example.ui.components.formatWatchedDate
-import com.example.ui.components.isSameLocalDay
-import com.example.ui.components.normalizeToLocalNoonMillis
-import com.example.ui.components.todayLocalNoonMillis
-import com.example.ui.theme.CinemaAlabaster
-import com.example.ui.theme.CinemaBorderSubtle
-import com.example.ui.theme.CinemaCrimson
-import com.example.ui.theme.CinemaEmerald
-import com.example.ui.theme.CinemaGold
-import com.example.ui.theme.CinemaObsidian
-import com.example.ui.theme.CinemaSilver
-import com.example.ui.theme.CinemaSlate
-import com.example.ui.theme.CinemaSlateElevated
+import com.example.ui.theme.CinemaTheme
 import java.text.NumberFormat
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -149,6 +125,7 @@ fun TitleDetailScreen(
     onUpdateRewatch: (Long) -> Unit,
     onDeleteEntry: () -> Unit
 ) {
+    val colors = CinemaTheme.colors
     val context = LocalContext.current
     val displayTitle = catalogTitle?.title?.ifBlank { vaultEntry?.title } ?: vaultEntry?.title ?: "Untitled"
     val displayYear = catalogTitle?.releaseYear ?: vaultEntry?.releaseYear?.toInt() ?: 2024
@@ -175,7 +152,7 @@ fun TitleDetailScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(CinemaObsidian)
+            .background(colors.obsidian)
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -197,9 +174,9 @@ fun TitleDetailScreen(
                             .height(275.dp)
                             .background(
                                 Brush.verticalGradient(
-                                    0.0f to CinemaObsidian.copy(alpha = 0.42f),
-                                    0.55f to CinemaObsidian.copy(alpha = 0.72f),
-                                    1.0f to CinemaObsidian
+                                    0.0f to colors.scrimDark.copy(alpha = 0.42f),
+                                    0.55f to colors.obsidian.copy(alpha = 0.72f),
+                                    1.0f to colors.obsidian
                                 )
                             )
                     )
@@ -213,7 +190,7 @@ fun TitleDetailScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Surface(
-                            color = CinemaObsidian.copy(alpha = 0.72f),
+                            color = colors.scrimDark.copy(alpha = 0.72f),
                             shape = CircleShape,
                             border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f))
                         ) {
@@ -224,16 +201,16 @@ fun TitleDetailScreen(
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                                     contentDescription = "Back",
-                                    tint = CinemaAlabaster
+                                    tint = colors.onScrimLight
                                 )
                             }
                         }
 
                         if (vaultEntry != null) {
                             Surface(
-                                color = CinemaObsidian.copy(alpha = 0.72f),
+                                color = colors.scrimDark.copy(alpha = 0.72f),
                                 shape = CircleShape,
-                                border = BorderStroke(1.dp, CinemaCrimson.copy(alpha = 0.4f))
+                                border = BorderStroke(1.dp, colors.crimson.copy(alpha = 0.4f))
                             ) {
                                 IconButton(
                                     onClick = { showDeleteDialog = true },
@@ -242,7 +219,7 @@ fun TitleDetailScreen(
                                     Icon(
                                         imageVector = Icons.Rounded.DeleteOutline,
                                         contentDescription = "Remove from Vault",
-                                        tint = CinemaCrimson
+                                        tint = colors.crimson
                                     )
                                 }
                             }
@@ -278,7 +255,7 @@ fun TitleDetailScreen(
                             Text(
                                 text = displayTitle,
                                 style = MaterialTheme.typography.displayMedium,
-                                color = CinemaAlabaster
+                                color = colors.alabaster
                             )
 
                             if (catalogTitle?.tagline?.isNotBlank() == true) {
@@ -286,7 +263,7 @@ fun TitleDetailScreen(
                                     text = "\"${catalogTitle.tagline}\"",
                                     style = MaterialTheme.typography.bodySmall,
                                     fontStyle = FontStyle.Italic,
-                                    color = CinemaGold
+                                    color = colors.gold
                                 )
                             }
 
@@ -300,17 +277,17 @@ fun TitleDetailScreen(
                                 Text(
                                     text = "$displayYear",
                                     style = MaterialTheme.typography.labelMedium,
-                                    color = CinemaSilver
+                                    color = colors.silver
                                 )
                                 if (catalogTitle?.ageRating?.isNotBlank() == true) {
                                     Surface(
-                                        color = CinemaSlateElevated,
+                                        color = colors.slateElevated,
                                         shape = RoundedCornerShape(6.dp)
                                     ) {
                                         Text(
                                             text = catalogTitle.ageRating,
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = CinemaAlabaster,
+                                            color = colors.alabaster,
                                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                         )
                                     }
@@ -324,8 +301,8 @@ fun TitleDetailScreen(
             if (isLoadingDetail) {
                 item(key = "detail_loading_bar") {
                     LinearProgressIndicator(
-                        color = CinemaGold,
-                        trackColor = CinemaSlateElevated,
+                        color = colors.gold,
+                        trackColor = colors.slateElevated,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 6.dp)
@@ -361,12 +338,12 @@ fun TitleDetailScreen(
                             enabled = !isMutating,
                             shape = RoundedCornerShape(14.dp),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isWatchlist) CinemaGold else CinemaSlate,
-                                contentColor = if (isWatchlist) CinemaObsidian else CinemaAlabaster
+                                containerColor = if (isWatchlist) colors.gold else colors.slate,
+                                contentColor = if (isWatchlist) colors.onGold else colors.alabaster
                             ),
                             border = BorderStroke(
                                 1.dp,
-                                if (isWatchlist) CinemaGold else CinemaBorderSubtle
+                                if (isWatchlist) colors.gold else colors.borderSubtle
                             ),
                             modifier = Modifier
                                 .weight(1.25f)
@@ -388,12 +365,16 @@ fun TitleDetailScreen(
                             enabled = !isMutating,
                             shape = RoundedCornerShape(14.dp),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isWatched) CinemaEmerald else CinemaSlate,
-                                contentColor = if (isWatched) CinemaObsidian else CinemaAlabaster
+                                containerColor = if (isWatched) colors.emerald else colors.slate,
+                                contentColor = if (isWatched) {
+                                    if (colors.isDark) colors.obsidian else colors.onGold
+                                } else {
+                                    colors.alabaster
+                                }
                             ),
                             border = BorderStroke(
                                 1.dp,
-                                if (isWatched) CinemaEmerald else CinemaBorderSubtle
+                                if (isWatched) colors.emerald else colors.borderSubtle
                             ),
                             modifier = Modifier
                                 .weight(1f)
@@ -415,9 +396,9 @@ fun TitleDetailScreen(
                         val relLabel = catalogTitle?.releaseDate?.ifBlank { vaultEntry?.releaseDate.orEmpty() }
                             ?.ifBlank { displayYear.toString() } ?: displayYear.toString()
                         Surface(
-                            color = CinemaGold.copy(alpha = 0.12f),
+                            color = colors.gold.copy(alpha = 0.12f),
                             shape = RoundedCornerShape(12.dp),
-                            border = BorderStroke(1.dp, CinemaGold.copy(alpha = 0.35f)),
+                            border = BorderStroke(1.dp, colors.gold.copy(alpha = 0.35f)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(
@@ -428,13 +409,13 @@ fun TitleDetailScreen(
                                 Icon(
                                     imageVector = Icons.Rounded.Today,
                                     contentDescription = null,
-                                    tint = CinemaGold,
+                                    tint = colors.gold,
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Text(
                                     text = "Upcoming release ($relLabel) · Can be added to Bucketlist",
                                     style = MaterialTheme.typography.labelMedium,
-                                    color = CinemaGold
+                                    color = colors.gold
                                 )
                             }
                         }
@@ -443,9 +424,9 @@ fun TitleDetailScreen(
                     if (vaultEntry != null && vaultEntry.statusEnum == WatchStatus.WATCHED) {
                         val intScore = if (vaultEntry.userRating > 0.0) vaultEntry.userRating.roundToInt().coerceIn(1, 10) else 0
                         Surface(
-                            color = CinemaSlate,
+                            color = colors.slate,
                             shape = RoundedCornerShape(16.dp),
-                            border = BorderStroke(1.dp, CinemaEmerald.copy(alpha = 0.35f)),
+                            border = BorderStroke(1.dp, colors.emerald.copy(alpha = 0.35f)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Column(
@@ -461,7 +442,7 @@ fun TitleDetailScreen(
                                         Text(
                                             text = "YOUR WATCH LOG",
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = CinemaEmerald,
+                                            color = colors.emerald,
                                             fontWeight = FontWeight.Bold
                                         )
                                         Text(
@@ -471,18 +452,18 @@ fun TitleDetailScreen(
                                                 "Watched · Tap Edit to rate 1–10"
                                             },
                                             style = MaterialTheme.typography.titleMedium,
-                                            color = CinemaAlabaster
+                                            color = colors.alabaster
                                         )
                                     }
                                     TextButton(onClick = { onSetStatus(WatchStatus.WATCHED) }) {
-                                        Text("Edit Log", color = CinemaGold, fontWeight = FontWeight.Bold)
+                                        Text("Edit Log", color = colors.gold, fontWeight = FontWeight.Bold)
                                     }
                                 }
                                 if (vaultEntry.effectiveWatchedAt > 0L) {
                                     Text(
                                         text = "Watched on ${formatWatchedDate(vaultEntry.effectiveWatchedAt)}",
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = CinemaSilver
+                                        color = colors.silver
                                     )
                                 }
                                 if (vaultEntry.reviewTitle.isNotBlank()) {
@@ -490,7 +471,7 @@ fun TitleDetailScreen(
                                         text = "\"${vaultEntry.reviewTitle}\"",
                                         style = MaterialTheme.typography.bodyMedium,
                                         fontStyle = FontStyle.Italic,
-                                        color = CinemaGold
+                                        color = colors.gold
                                     )
                                 }
                             }
@@ -499,9 +480,9 @@ fun TitleDetailScreen(
 
                     if (vaultEntry != null) {
                         Surface(
-                            color = CinemaSlate,
+                            color = colors.slate,
                             shape = RoundedCornerShape(16.dp),
-                            border = BorderStroke(1.dp, CinemaBorderSubtle),
+                            border = BorderStroke(1.dp, colors.borderSubtle),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Column(
@@ -515,17 +496,22 @@ fun TitleDetailScreen(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(Icons.Rounded.PushPin, contentDescription = null, tint = CinemaGold, modifier = Modifier.size(18.dp))
+                                            Icon(Icons.Rounded.PushPin, contentDescription = null, tint = colors.gold, modifier = Modifier.size(18.dp))
                                             Spacer(modifier = Modifier.width(8.dp))
                                             Column {
-                                                Text("Pin as Up Next", style = MaterialTheme.typography.titleSmall, color = CinemaAlabaster)
-                                                Text("Prioritize at the top of your watchlist", style = MaterialTheme.typography.bodySmall, color = CinemaSilver)
+                                                Text("Pin as Up Next", style = MaterialTheme.typography.titleSmall, color = colors.alabaster)
+                                                Text("Prioritize at the top of your watchlist", style = MaterialTheme.typography.bodySmall, color = colors.silver)
                                             }
                                         }
                                         Switch(
                                             checked = vaultEntry.priority,
                                             onCheckedChange = { onTogglePriority() },
-                                            colors = SwitchDefaults.colors(checkedThumbColor = CinemaObsidian, checkedTrackColor = CinemaGold)
+                                            colors = SwitchDefaults.colors(
+                                                checkedThumbColor = colors.onGold,
+                                                checkedTrackColor = colors.gold,
+                                                uncheckedThumbColor = colors.silver,
+                                                uncheckedTrackColor = colors.slateElevated
+                                            )
                                         )
                                     }
                                 }
@@ -539,13 +525,13 @@ fun TitleDetailScreen(
                                             horizontalArrangement = Arrangement.SpaceBetween,
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Text("Episode Progress", style = MaterialTheme.typography.titleSmall, color = CinemaAlabaster)
-                                            Text("$watchedEp / $totalEpisodes EP", style = MaterialTheme.typography.labelMedium, color = CinemaGold)
+                                            Text("Episode Progress", style = MaterialTheme.typography.titleSmall, color = colors.alabaster)
+                                            Text("$watchedEp / $totalEpisodes EP", style = MaterialTheme.typography.labelMedium, color = colors.gold)
                                         }
                                         LinearProgressIndicator(
                                             progress = { progress },
-                                            color = CinemaGold,
-                                            trackColor = CinemaSlateElevated,
+                                            color = colors.gold,
+                                            trackColor = colors.slateElevated,
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .height(7.dp)
@@ -566,7 +552,10 @@ fun TitleDetailScreen(
                                                 onClick = { onUpdateEpisodes((watchedEp + 1).coerceAtMost(totalEpisodes.toLong())) },
                                                 enabled = watchedEp < totalEpisodes,
                                                 shape = RoundedCornerShape(10.dp),
-                                                colors = ButtonDefaults.buttonColors(containerColor = CinemaGold, contentColor = CinemaObsidian),
+                                                colors = ButtonDefaults.buttonColors(
+                                                    containerColor = colors.gold,
+                                                    contentColor = colors.onGold
+                                                ),
                                                 modifier = Modifier.weight(1f)
                                             ) {
                                                 Icon(Icons.Rounded.Add, contentDescription = "Increase episodes", modifier = Modifier.size(16.dp))
@@ -584,11 +573,11 @@ fun TitleDetailScreen(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(Icons.Rounded.Repeat, contentDescription = null, tint = CinemaEmerald, modifier = Modifier.size(18.dp))
+                                            Icon(Icons.Rounded.Repeat, contentDescription = null, tint = colors.emerald, modifier = Modifier.size(18.dp))
                                             Spacer(modifier = Modifier.width(8.dp))
                                             Column {
-                                                Text("Rewatches", style = MaterialTheme.typography.titleSmall, color = CinemaAlabaster)
-                                                Text("Logged ${vaultEntry.rewatchCount} rewatch(es)", style = MaterialTheme.typography.bodySmall, color = CinemaSilver)
+                                                Text("Rewatches", style = MaterialTheme.typography.titleSmall, color = colors.alabaster)
+                                                Text("Logged ${vaultEntry.rewatchCount} rewatch(es)", style = MaterialTheme.typography.bodySmall, color = colors.silver)
                                             }
                                         }
                                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -596,11 +585,11 @@ fun TitleDetailScreen(
                                                 onClick = { onUpdateRewatch((vaultEntry.rewatchCount - 1).coerceAtLeast(0)) },
                                                 enabled = vaultEntry.rewatchCount > 0
                                             ) {
-                                                Icon(Icons.Rounded.Remove, contentDescription = "Decrease rewatch", tint = CinemaSilver)
+                                                Icon(Icons.Rounded.Remove, contentDescription = "Decrease rewatch", tint = colors.silver)
                                             }
-                                            Text("${vaultEntry.rewatchCount}", style = MaterialTheme.typography.titleMedium, color = CinemaEmerald)
+                                            Text("${vaultEntry.rewatchCount}", style = MaterialTheme.typography.titleMedium, color = colors.emerald)
                                             IconButton(onClick = { onUpdateRewatch(vaultEntry.rewatchCount + 1) }) {
-                                                Icon(Icons.Rounded.Add, contentDescription = "Log rewatch", tint = CinemaEmerald)
+                                                Icon(Icons.Rounded.Add, contentDescription = "Log rewatch", tint = colors.emerald)
                                             }
                                         }
                                     }
@@ -624,14 +613,14 @@ fun TitleDetailScreen(
                         ) {
                             displayGenres.forEach { genre ->
                                 Surface(
-                                    color = CinemaSlateElevated,
+                                    color = colors.slateElevated,
                                     shape = CircleShape,
-                                    border = BorderStroke(1.dp, CinemaBorderSubtle)
+                                    border = BorderStroke(1.dp, colors.borderSubtle)
                                 ) {
                                     Text(
                                         text = genre,
                                         style = MaterialTheme.typography.labelLarge,
-                                        color = CinemaAlabaster,
+                                        color = colors.alabaster,
                                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
                                     )
                                 }
@@ -666,8 +655,8 @@ fun TitleDetailScreen(
 
                     if (displaySynopsis.isNotBlank()) {
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text("Synopsis", style = MaterialTheme.typography.headlineSmall, color = CinemaAlabaster)
-                            Text(displaySynopsis, style = MaterialTheme.typography.bodyLarge, color = CinemaSilver)
+                            Text("Synopsis", style = MaterialTheme.typography.headlineSmall, color = colors.alabaster)
+                            Text(displaySynopsis, style = MaterialTheme.typography.bodyLarge, color = colors.silver)
                         }
                     } else if (isLoadingDetail) {
                         SynopsisSkeletonBlock()
@@ -677,16 +666,16 @@ fun TitleDetailScreen(
                     if (catalogTitle != null && catalogTitle.watchProviders.isNotEmpty()) {
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Rounded.LiveTv, contentDescription = null, tint = CinemaGold, modifier = Modifier.size(18.dp))
+                                Icon(Icons.Rounded.LiveTv, contentDescription = null, tint = colors.gold, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Where to Watch", style = MaterialTheme.typography.headlineSmall, color = CinemaAlabaster)
+                                Text("Where to Watch", style = MaterialTheme.typography.headlineSmall, color = colors.alabaster)
                             }
                             LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                 items(catalogTitle.watchProviders, key = { "${it.id}_${it.tier}" }) { provider ->
                                     Surface(
-                                        color = CinemaSlate,
+                                        color = colors.slate,
                                         shape = RoundedCornerShape(12.dp),
-                                        border = BorderStroke(1.dp, CinemaBorderSubtle)
+                                        border = BorderStroke(1.dp, colors.borderSubtle)
                                     ) {
                                         Row(
                                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
@@ -706,8 +695,8 @@ fun TitleDetailScreen(
                                                 Spacer(modifier = Modifier.width(8.dp))
                                             }
                                             Column {
-                                                Text(provider.name, style = MaterialTheme.typography.labelLarge, color = CinemaAlabaster)
-                                                Text(provider.tier, style = MaterialTheme.typography.labelSmall, color = CinemaEmerald)
+                                                Text(provider.name, style = MaterialTheme.typography.labelLarge, color = colors.alabaster)
+                                                Text(provider.tier, style = MaterialTheme.typography.labelSmall, color = colors.emerald)
                                             }
                                         }
                                     }
@@ -720,9 +709,9 @@ fun TitleDetailScreen(
                     val collection = catalogTitle?.collection
                     if (collection != null) {
                         Surface(
-                            color = CinemaSlate,
+                            color = colors.slate,
                             shape = RoundedCornerShape(16.dp),
-                            border = BorderStroke(1.dp, CinemaGold.copy(alpha = 0.45f)),
+                            border = BorderStroke(1.dp, colors.gold.copy(alpha = 0.45f)),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(16.dp))
@@ -735,15 +724,15 @@ fun TitleDetailScreen(
                                 Icon(
                                     imageVector = Icons.Rounded.CollectionsBookmark,
                                     contentDescription = null,
-                                    tint = CinemaGold,
+                                    tint = colors.gold,
                                     modifier = Modifier.size(24.dp)
                                 )
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text("PART OF COLLECTION", style = MaterialTheme.typography.labelSmall, color = CinemaGold)
-                                    Text(collection.name, style = MaterialTheme.typography.titleMedium, color = CinemaAlabaster)
+                                    Text("PART OF COLLECTION", style = MaterialTheme.typography.labelSmall, color = colors.gold)
+                                    Text(collection.name, style = MaterialTheme.typography.titleMedium, color = colors.alabaster)
                                 }
-                                Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = "Open collection", tint = CinemaGold)
+                                Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = "Open collection", tint = colors.gold)
                             }
                         }
                     }
@@ -755,13 +744,13 @@ fun TitleDetailScreen(
                         catalogTitle.seasons.isNotEmpty()
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Text("Seasons & Episodes", style = MaterialTheme.typography.headlineSmall, color = CinemaAlabaster)
+                            Text("Seasons & Episodes", style = MaterialTheme.typography.headlineSmall, color = colors.alabaster)
                             LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 items(catalogTitle.seasons, key = { "season_${it.seasonNumber}" }) { season ->
                                     Surface(
-                                        color = CinemaSlate,
+                                        color = colors.slate,
                                         shape = RoundedCornerShape(14.dp),
-                                        border = BorderStroke(1.dp, CinemaBorderSubtle),
+                                        border = BorderStroke(1.dp, colors.borderSubtle),
                                         modifier = Modifier
                                             .width(154.dp)
                                             .clip(RoundedCornerShape(14.dp))
@@ -784,14 +773,14 @@ fun TitleDetailScreen(
                                             Text(
                                                 text = season.name,
                                                 style = MaterialTheme.typography.titleSmall,
-                                                color = CinemaAlabaster,
+                                                color = colors.alabaster,
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
                                             )
                                             Text(
                                                 text = "${season.episodeCount} Episodes",
                                                 style = MaterialTheme.typography.labelSmall,
-                                                color = CinemaGold
+                                                color = colors.gold
                                             )
                                         }
                                     }
@@ -800,18 +789,18 @@ fun TitleDetailScreen(
                         }
                     }
 
-                    // Production Details (Awards already highlighted inside Ratings & Awards section)
+                    // Production Details
                     Surface(
-                        color = CinemaSlate,
+                        color = colors.slate,
                         shape = RoundedCornerShape(18.dp),
-                        border = BorderStroke(1.dp, CinemaBorderSubtle),
+                        border = BorderStroke(1.dp, colors.borderSubtle),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(
                             modifier = Modifier.padding(16.dp),
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Text("Production Details", style = MaterialTheme.typography.headlineSmall, color = CinemaAlabaster)
+                            Text("Production Details", style = MaterialTheme.typography.headlineSmall, color = colors.alabaster)
                             DetailFactRow(
                                 label = if (displayMediaType == MediaType.SERIES) "Creator / Showrunner" else "Director",
                                 value = displayDirector
@@ -837,14 +826,14 @@ fun TitleDetailScreen(
                     // Trailers & Videos
                     if (catalogTitle != null && catalogTitle.videos.isNotEmpty()) {
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Text("Trailers & Featurettes", style = MaterialTheme.typography.headlineSmall, color = CinemaAlabaster)
+                            Text("Trailers & Featurettes", style = MaterialTheme.typography.headlineSmall, color = colors.alabaster)
                             LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                 items(catalogTitle.videos, key = { it.id }) { video ->
                                     val url = video.youtubeUrl
                                     Surface(
-                                        color = CinemaSlate,
+                                        color = colors.slate,
                                         shape = RoundedCornerShape(14.dp),
-                                        border = BorderStroke(1.dp, CinemaGold.copy(alpha = 0.35f)),
+                                        border = BorderStroke(1.dp, colors.gold.copy(alpha = 0.35f)),
                                         modifier = Modifier
                                             .width(210.dp)
                                             .clip(RoundedCornerShape(14.dp))
@@ -857,11 +846,11 @@ fun TitleDetailScreen(
                                             }
                                     ) {
                                         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(Icons.Rounded.PlayCircle, contentDescription = "Play ${video.name}", tint = CinemaGold, modifier = Modifier.size(30.dp))
+                                            Icon(Icons.Rounded.PlayCircle, contentDescription = "Play ${video.name}", tint = colors.gold, modifier = Modifier.size(30.dp))
                                             Spacer(modifier = Modifier.width(10.dp))
                                             Column {
-                                                Text(video.name, style = MaterialTheme.typography.titleSmall, color = CinemaAlabaster, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                                Text("${video.type} · ${video.site}", style = MaterialTheme.typography.labelSmall, color = CinemaSilver)
+                                                Text(video.name, style = MaterialTheme.typography.titleSmall, color = colors.alabaster, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                Text("${video.type} · ${video.site}", style = MaterialTheme.typography.labelSmall, color = colors.silver)
                                             }
                                         }
                                     }
@@ -870,16 +859,16 @@ fun TitleDetailScreen(
                         }
                     }
 
-                    // Cast Section (Clickable to PersonDetailScreen when TMDB person id > 0)
+                    // Cast Section
                     if (catalogTitle != null && catalogTitle.cast.isNotEmpty()) {
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Text("Top Billed Cast", style = MaterialTheme.typography.headlineSmall, color = CinemaAlabaster)
+                            Text("Top Billed Cast", style = MaterialTheme.typography.headlineSmall, color = colors.alabaster)
                             LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                 items(catalogTitle.cast, key = { "${it.id}_${it.actor}_${it.role}" }) { member ->
                                     Surface(
-                                        color = CinemaSlate,
+                                        color = colors.slate,
                                         shape = RoundedCornerShape(14.dp),
-                                        border = BorderStroke(1.dp, CinemaBorderSubtle),
+                                        border = BorderStroke(1.dp, colors.borderSubtle),
                                         modifier = Modifier
                                             .width(156.dp)
                                             .clip(RoundedCornerShape(14.dp))
@@ -900,21 +889,21 @@ fun TitleDetailScreen(
                                                     modifier = Modifier
                                                         .size(44.dp)
                                                         .clip(CircleShape)
-                                                        .background(CinemaSlateElevated)
+                                                        .background(colors.slateElevated)
                                                 )
                                             } else {
                                                 Box(
                                                     modifier = Modifier
                                                         .size(40.dp)
                                                         .clip(CircleShape)
-                                                        .background(CinemaGold.copy(alpha = 0.16f)),
+                                                        .background(colors.gold.copy(alpha = 0.16f)),
                                                     contentAlignment = Alignment.Center
                                                 ) {
-                                                    Icon(Icons.Rounded.Person, contentDescription = null, tint = CinemaGold, modifier = Modifier.size(20.dp))
+                                                    Icon(Icons.Rounded.Person, contentDescription = null, tint = colors.gold, modifier = Modifier.size(20.dp))
                                                 }
                                             }
-                                            Text(member.actor, style = MaterialTheme.typography.titleSmall, color = CinemaAlabaster, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                            Text(member.role, style = MaterialTheme.typography.bodySmall, color = CinemaSilver, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            Text(member.actor, style = MaterialTheme.typography.titleSmall, color = colors.alabaster, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            Text(member.role, style = MaterialTheme.typography.bodySmall, color = colors.silver, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                         }
                                     }
                                 }
@@ -925,7 +914,7 @@ fun TitleDetailScreen(
                     // Backdrop Gallery
                     if (catalogTitle != null && catalogTitle.backdrops.isNotEmpty()) {
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Text("Stills & Backdrops", style = MaterialTheme.typography.headlineSmall, color = CinemaAlabaster)
+                            Text("Stills & Backdrops", style = MaterialTheme.typography.headlineSmall, color = colors.alabaster)
                             LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                 items(catalogTitle.backdrops, key = { it }) { url ->
                                     AsyncImage(
@@ -936,7 +925,7 @@ fun TitleDetailScreen(
                                             .width(230.dp)
                                             .height(130.dp)
                                             .clip(RoundedCornerShape(14.dp))
-                                            .background(CinemaSlateElevated)
+                                            .background(colors.slateElevated)
                                     )
                                 }
                             }
@@ -946,21 +935,21 @@ fun TitleDetailScreen(
                     // Keywords
                     if (catalogTitle != null && catalogTitle.keywords.isNotEmpty()) {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("Themes & Keywords", style = MaterialTheme.typography.headlineSmall, color = CinemaAlabaster)
+                            Text("Themes & Keywords", style = MaterialTheme.typography.headlineSmall, color = colors.alabaster)
                             FlowRow(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 catalogTitle.keywords.forEach { kw ->
                                     Surface(
-                                        color = CinemaSlate,
+                                        color = colors.slate,
                                         shape = RoundedCornerShape(8.dp),
-                                        border = BorderStroke(1.dp, CinemaBorderSubtle)
+                                        border = BorderStroke(1.dp, colors.borderSubtle)
                                     ) {
                                         Text(
                                             text = "#$kw",
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = CinemaGold,
+                                            color = colors.gold,
                                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
                                         )
                                     }
@@ -972,13 +961,13 @@ fun TitleDetailScreen(
                     // TMDB Community Reviews
                     if (catalogTitle != null && catalogTitle.tmdbReviews.isNotEmpty()) {
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Text("TMDB Community Reviews", style = MaterialTheme.typography.headlineSmall, color = CinemaAlabaster)
+                            Text("TMDB Community Reviews", style = MaterialTheme.typography.headlineSmall, color = colors.alabaster)
                             catalogTitle.tmdbReviews.take(4).forEach { review ->
                                 var expanded by remember(review.id) { mutableStateOf(false) }
                                 Surface(
-                                    color = CinemaSlate,
+                                    color = colors.slate,
                                     shape = RoundedCornerShape(16.dp),
-                                    border = BorderStroke(1.dp, CinemaBorderSubtle),
+                                    border = BorderStroke(1.dp, colors.borderSubtle),
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(16.dp))
@@ -993,27 +982,27 @@ fun TitleDetailScreen(
                                             horizontalArrangement = Arrangement.SpaceBetween,
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Text(review.author, style = MaterialTheme.typography.titleSmall, color = CinemaAlabaster)
+                                            Text(review.author, style = MaterialTheme.typography.titleSmall, color = colors.alabaster)
                                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                                 if (review.rating != null && review.rating > 0.0) {
                                                     RatingPill(score = review.rating)
                                                 }
                                                 if (review.createdAt.isNotBlank()) {
-                                                    Text(review.createdAt, style = MaterialTheme.typography.labelSmall, color = CinemaSilver)
+                                                    Text(review.createdAt, style = MaterialTheme.typography.labelSmall, color = colors.silver)
                                                 }
                                             }
                                         }
                                         Text(
                                             text = review.content,
                                             style = MaterialTheme.typography.bodySmall,
-                                            color = CinemaSilver,
+                                            color = colors.silver,
                                             maxLines = if (expanded) 20 else 4,
                                             overflow = TextOverflow.Ellipsis
                                         )
                                         Text(
                                             text = if (expanded) "Show less" else "Tap to read full review",
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = CinemaGold
+                                            color = colors.gold
                                         )
                                     }
                                 }
@@ -1042,16 +1031,15 @@ fun TitleDetailScreen(
                     }
                 }
             }
-
         }
     }
 
     if (showDeleteDialog && vaultEntry != null) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            containerColor = CinemaSlate,
-            titleContentColor = CinemaAlabaster,
-            textContentColor = CinemaSilver,
+            containerColor = colors.slate,
+            titleContentColor = colors.alabaster,
+            textContentColor = colors.silver,
             title = { Text("Remove from Vault?") },
             text = { Text("\"${vaultEntry.title}\" and your saved rating/review will be removed from your Vault.") },
             confirmButton = {
@@ -1061,12 +1049,12 @@ fun TitleDetailScreen(
                         onDeleteEntry()
                     }
                 ) {
-                    Text("Remove", color = CinemaCrimson)
+                    Text("Remove", color = colors.crimson)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = false }) {
-                    Text("Cancel", color = CinemaSilver)
+                    Text("Cancel", color = colors.silver)
                 }
             }
         )
@@ -1080,8 +1068,9 @@ private fun HorizontalTitleRow(
     keyPrefix: String,
     onTitleClick: (String) -> Unit
 ) {
+    val colors = CinemaTheme.colors
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(heading, style = MaterialTheme.typography.headlineSmall, color = CinemaAlabaster)
+        Text(heading, style = MaterialTheme.typography.headlineSmall, color = colors.alabaster)
         LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             items(items, key = { "${keyPrefix}_${it.id}" }) { item ->
                 Column(
@@ -1104,14 +1093,14 @@ private fun HorizontalTitleRow(
                     Text(
                         text = item.title,
                         style = MaterialTheme.typography.labelLarge,
-                        color = CinemaAlabaster,
+                        color = colors.alabaster,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = "${item.releaseYear}",
                         style = MaterialTheme.typography.labelSmall,
-                        color = CinemaSilver
+                        color = colors.silver
                     )
                 }
             }
@@ -1124,13 +1113,14 @@ private fun DetailFactRow(
     label: String,
     value: String
 ) {
+    val colors = CinemaTheme.colors
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = CinemaSilver)
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = colors.silver)
         Spacer(modifier = Modifier.width(16.dp))
-        Text(value, style = MaterialTheme.typography.bodyMedium, color = CinemaAlabaster, fontWeight = FontWeight.Medium)
+        Text(value, style = MaterialTheme.typography.bodyMedium, color = colors.alabaster, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -1141,12 +1131,13 @@ private fun RatingsAndAwardsSection(
     dataSource: DataSourceOrigin,
     modifier: Modifier = Modifier
 ) {
+    val colors = CinemaTheme.colors
     val awardsText = if (ratingsAndAwards.hasAwards) ratingsAndAwards.awards else fallbackAwards
 
     Surface(
-        color = CinemaSlate,
+        color = colors.slate,
         shape = RoundedCornerShape(20.dp),
-        border = BorderStroke(1.dp, CinemaGold.copy(alpha = 0.32f)),
+        border = BorderStroke(1.dp, colors.gold.copy(alpha = 0.32f)),
         modifier = modifier
             .fillMaxWidth()
             .testTag("detail_ratings_awards_section")
@@ -1163,17 +1154,17 @@ private fun RatingsAndAwardsSection(
                 Text(
                     text = "Ratings & Awards",
                     style = MaterialTheme.typography.headlineSmall,
-                    color = CinemaAlabaster
+                    color = colors.alabaster
                 )
                 Surface(
-                    color = CinemaSlateElevated,
+                    color = colors.slateElevated,
                     shape = CircleShape,
-                    border = BorderStroke(1.dp, CinemaBorderSubtle)
+                    border = BorderStroke(1.dp, colors.borderSubtle)
                 ) {
                     Text(
                         text = dataSource.label,
                         style = MaterialTheme.typography.labelSmall,
-                        color = CinemaSilver,
+                        color = colors.silver,
                         modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
                     )
                 }
@@ -1187,12 +1178,12 @@ private fun RatingsAndAwardsSection(
                     sourceLabel = "IMDb",
                     scoreValue = ratingsAndAwards.imdbRating.ifBlank { "—" },
                     subLabel = ratingsAndAwards.imdbVotes.takeIf { it.isNotBlank() }?.let { "$it votes" } ?: "Audience",
-                    accentColor = CinemaGold,
+                    accentColor = colors.gold,
                     iconContent = {
                         Icon(
                             imageVector = Icons.Rounded.Star,
                             contentDescription = "IMDb Rating",
-                            tint = CinemaGold,
+                            tint = colors.gold,
                             modifier = Modifier.size(20.dp)
                         )
                     },
@@ -1203,7 +1194,7 @@ private fun RatingsAndAwardsSection(
                     sourceLabel = "Rotten Tomatoes",
                     scoreValue = ratingsAndAwards.rottenTomatoes.ifBlank { "—" },
                     subLabel = "Tomatometer",
-                    accentColor = CinemaCrimson,
+                    accentColor = colors.crimson,
                     iconContent = {
                         RottenTomatoesIcon(modifier = Modifier.size(20.dp))
                     },
@@ -1212,10 +1203,10 @@ private fun RatingsAndAwardsSection(
 
                 val metaNumeric = Regex("(\\d+)").find(ratingsAndAwards.metacritic)?.groupValues?.getOrNull(1)?.toIntOrNull()
                 val metaColor = when {
-                    metaNumeric == null -> CinemaSilver
-                    metaNumeric >= 61 -> CinemaEmerald
-                    metaNumeric >= 40 -> CinemaGold
-                    else -> CinemaCrimson
+                    metaNumeric == null -> colors.silver
+                    metaNumeric >= 61 -> colors.emerald
+                    metaNumeric >= 40 -> colors.gold
+                    else -> colors.crimson
                 }
                 RatingMetricTile(
                     sourceLabel = "Metacritic",
@@ -1244,9 +1235,9 @@ private fun RatingsAndAwardsSection(
 
             if (awardsText.isNotBlank()) {
                 Surface(
-                    color = CinemaGold.copy(alpha = 0.12f),
+                    color = colors.gold.copy(alpha = 0.12f),
                     shape = RoundedCornerShape(14.dp),
-                    border = BorderStroke(1.dp, CinemaGold.copy(alpha = 0.35f)),
+                    border = BorderStroke(1.dp, colors.gold.copy(alpha = 0.35f)),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("detail_awards_banner")
@@ -1260,13 +1251,13 @@ private fun RatingsAndAwardsSection(
                             modifier = Modifier
                                 .size(36.dp)
                                 .clip(RoundedCornerShape(10.dp))
-                                .background(CinemaGold.copy(alpha = 0.18f)),
+                                .background(colors.gold.copy(alpha = 0.18f)),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Rounded.EmojiEvents,
                                 contentDescription = "Awards",
-                                tint = CinemaGold,
+                                tint = colors.gold,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -1277,13 +1268,13 @@ private fun RatingsAndAwardsSection(
                             Text(
                                 text = "AWARDS & HONORS",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = CinemaGold,
+                                color = colors.gold,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
                                 text = awardsText,
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = CinemaAlabaster,
+                                color = colors.alabaster,
                                 fontWeight = FontWeight.Medium
                             )
                         }
@@ -1303,10 +1294,11 @@ private fun RatingMetricTile(
     iconContent: @Composable () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = CinemaTheme.colors
     Surface(
-        color = CinemaSlateElevated,
+        color = colors.slateElevated,
         shape = RoundedCornerShape(14.dp),
-        border = BorderStroke(1.dp, CinemaBorderSubtle),
+        border = BorderStroke(1.dp, colors.borderSubtle),
         modifier = modifier
     ) {
         Column(
@@ -1320,7 +1312,7 @@ private fun RatingMetricTile(
             Text(
                 text = scoreValue,
                 style = MaterialTheme.typography.titleMedium,
-                color = if (scoreValue == "—") CinemaSilver else CinemaAlabaster,
+                color = if (scoreValue == "—") colors.silver else colors.alabaster,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1
             )
@@ -1335,7 +1327,7 @@ private fun RatingMetricTile(
             Text(
                 text = subLabel,
                 style = MaterialTheme.typography.labelSmall,
-                color = CinemaSilver.copy(alpha = 0.78f),
+                color = colors.silver.copy(alpha = 0.78f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -1345,6 +1337,9 @@ private fun RatingMetricTile(
 
 @Composable
 private fun RottenTomatoesIcon(modifier: Modifier = Modifier) {
+    val colors = CinemaTheme.colors
+    val crimsonColor = colors.crimson
+    val emeraldColor = colors.emerald
     Box(
         modifier = modifier,
         contentAlignment = Alignment.Center
@@ -1353,12 +1348,12 @@ private fun RottenTomatoesIcon(modifier: Modifier = Modifier) {
             val w = size.width
             val h = size.height
             drawCircle(
-                color = CinemaCrimson,
+                color = crimsonColor,
                 radius = minOf(w, h) * 0.38f,
                 center = Offset(w * 0.5f, h * 0.56f)
             )
             drawCircle(
-                color = CinemaEmerald,
+                color = emeraldColor,
                 radius = minOf(w, h) * 0.14f,
                 center = Offset(w * 0.5f, h * 0.20f)
             )
@@ -1368,6 +1363,7 @@ private fun RottenTomatoesIcon(modifier: Modifier = Modifier) {
 
 @Composable
 private fun RatingsAndAwardsSkeletonCard(modifier: Modifier = Modifier) {
+    val colors = CinemaTheme.colors
     val pulse = rememberInfiniteTransition(label = "ratings_skeleton_pulse")
     val alpha by pulse.animateFloat(
         initialValue = 0.35f,
@@ -1380,9 +1376,9 @@ private fun RatingsAndAwardsSkeletonCard(modifier: Modifier = Modifier) {
     )
 
     Surface(
-        color = CinemaSlate,
+        color = colors.slate,
         shape = RoundedCornerShape(20.dp),
-        border = BorderStroke(1.dp, CinemaBorderSubtle),
+        border = BorderStroke(1.dp, colors.borderSubtle),
         modifier = modifier
             .fillMaxWidth()
             .testTag("detail_ratings_skeleton")
@@ -1396,7 +1392,7 @@ private fun RatingsAndAwardsSkeletonCard(modifier: Modifier = Modifier) {
                     .width(150.dp)
                     .height(18.dp)
                     .clip(RoundedCornerShape(6.dp))
-                    .background(CinemaSlateElevated.copy(alpha = alpha))
+                    .background(colors.slateElevated.copy(alpha = alpha))
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1408,7 +1404,7 @@ private fun RatingsAndAwardsSkeletonCard(modifier: Modifier = Modifier) {
                             .weight(1f)
                             .height(84.dp)
                             .clip(RoundedCornerShape(14.dp))
-                            .background(CinemaSlateElevated.copy(alpha = alpha))
+                            .background(colors.slateElevated.copy(alpha = alpha))
                     )
                 }
             }
@@ -1417,7 +1413,7 @@ private fun RatingsAndAwardsSkeletonCard(modifier: Modifier = Modifier) {
                     .fillMaxWidth()
                     .height(48.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(CinemaSlateElevated.copy(alpha = alpha))
+                    .background(colors.slateElevated.copy(alpha = alpha))
             )
         }
     }
@@ -1425,6 +1421,7 @@ private fun RatingsAndAwardsSkeletonCard(modifier: Modifier = Modifier) {
 
 @Composable
 private fun SynopsisSkeletonBlock(modifier: Modifier = Modifier) {
+    val colors = CinemaTheme.colors
     val pulse = rememberInfiniteTransition(label = "synopsis_skeleton_pulse")
     val alpha by pulse.animateFloat(
         initialValue = 0.35f,
@@ -1444,21 +1441,21 @@ private fun SynopsisSkeletonBlock(modifier: Modifier = Modifier) {
                 .width(110.dp)
                 .height(18.dp)
                 .clip(RoundedCornerShape(6.dp))
-                .background(CinemaSlateElevated.copy(alpha = alpha))
+                .background(colors.slateElevated.copy(alpha = alpha))
         )
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(14.dp)
                 .clip(RoundedCornerShape(6.dp))
-                .background(CinemaSlateElevated.copy(alpha = alpha))
+                .background(colors.slateElevated.copy(alpha = alpha))
         )
         Box(
             modifier = Modifier
                 .fillMaxWidth(0.85f)
                 .height(14.dp)
                 .clip(RoundedCornerShape(6.dp))
-                .background(CinemaSlateElevated.copy(alpha = alpha))
+                .background(colors.slateElevated.copy(alpha = alpha))
         )
     }
 }
@@ -1469,10 +1466,11 @@ private fun DetailErrorCard(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = CinemaTheme.colors
     Surface(
-        color = CinemaSlate,
+        color = colors.slate,
         shape = RoundedCornerShape(18.dp),
-        border = BorderStroke(1.dp, CinemaCrimson.copy(alpha = 0.45f)),
+        border = BorderStroke(1.dp, colors.crimson.copy(alpha = 0.45f)),
         modifier = modifier
             .fillMaxWidth()
             .testTag("detail_error_card")
@@ -1487,27 +1485,27 @@ private fun DetailErrorCard(
             Icon(
                 imageVector = Icons.Rounded.CloudOff,
                 contentDescription = null,
-                tint = CinemaCrimson,
+                tint = colors.crimson,
                 modifier = Modifier.size(32.dp)
             )
             Text(
                 text = "Unable to load title details",
                 style = MaterialTheme.typography.titleMedium,
-                color = CinemaAlabaster,
+                color = colors.alabaster,
                 fontWeight = FontWeight.Bold
             )
             Text(
                 text = message,
                 style = MaterialTheme.typography.bodySmall,
-                color = CinemaSilver,
+                color = colors.silver,
                 textAlign = TextAlign.Center
             )
             Button(
                 onClick = onRetry,
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = CinemaGold,
-                    contentColor = CinemaObsidian
+                    containerColor = colors.gold,
+                    contentColor = colors.onGold
                 ),
                 modifier = Modifier.height(48.dp)
             ) {

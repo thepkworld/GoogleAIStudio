@@ -44,12 +44,8 @@ import com.example.data.model.VaultEntry
 import com.example.ui.components.CinemaBackdropImage
 import com.example.ui.components.CinemaPosterArtwork
 import com.example.ui.components.RatingPill
-import com.example.ui.theme.CinemaAlabaster
-import com.example.ui.theme.CinemaBorderSubtle
 import com.example.ui.theme.CinemaGold
-import com.example.ui.theme.CinemaObsidian
-import com.example.ui.theme.CinemaSilver
-import com.example.ui.theme.CinemaSlate
+import com.example.ui.theme.CinemaTheme
 
 @Composable
 fun CollectionDetailScreen(
@@ -59,17 +55,18 @@ fun CollectionDetailScreen(
     onBack: () -> Unit,
     onTitleClick: (String) -> Unit
 ) {
+    val colors = CinemaTheme.colors
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(CinemaObsidian)
+            .background(colors.obsidian)
     ) {
         if (isLoading && collectionDetail == null) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
-                CircularProgressIndicator(color = CinemaGold)
+                CircularProgressIndicator(color = colors.gold)
             }
         } else if (collectionDetail != null) {
             LazyColumn(
@@ -93,15 +90,15 @@ fun CollectionDetailScreen(
                                 .height(250.dp)
                                 .background(
                                     Brush.verticalGradient(
-                                        0.0f to CinemaObsidian.copy(alpha = 0.4f),
-                                        0.6f to CinemaObsidian.copy(alpha = 0.78f),
-                                        1.0f to CinemaObsidian
+                                        0.0f to colors.scrimDark.copy(alpha = 0.4f),
+                                        0.6f to colors.scrimDark.copy(alpha = 0.78f),
+                                        1.0f to colors.scrimDark
                                     )
                                 )
                         )
 
                         Surface(
-                            color = CinemaObsidian.copy(alpha = 0.72f),
+                            color = colors.scrimDark.copy(alpha = 0.72f),
                             shape = CircleShape,
                             border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
                             modifier = Modifier
@@ -115,7 +112,7 @@ fun CollectionDetailScreen(
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                                     contentDescription = "Back",
-                                    tint = CinemaAlabaster
+                                    tint = colors.onScrimLight
                                 )
                             }
                         }
@@ -127,7 +124,7 @@ fun CollectionDetailScreen(
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Surface(
-                                color = CinemaGold.copy(alpha = 0.2f),
+                                color = CinemaGold.copy(alpha = 0.22f),
                                 shape = RoundedCornerShape(6.dp)
                             ) {
                                 Text(
@@ -140,7 +137,7 @@ fun CollectionDetailScreen(
                             Text(
                                 text = collectionDetail.name,
                                 style = MaterialTheme.typography.displayMedium,
-                                color = CinemaAlabaster
+                                color = colors.onScrimLight
                             )
                         }
                     }
@@ -151,7 +148,7 @@ fun CollectionDetailScreen(
                         Text(
                             text = collectionDetail.overview,
                             style = MaterialTheme.typography.bodyLarge,
-                            color = CinemaSilver,
+                            color = colors.silver,
                             modifier = Modifier.padding(horizontal = 16.dp)
                         )
                     }
@@ -160,9 +157,9 @@ fun CollectionDetailScreen(
                 itemsIndexed(collectionDetail.parts, key = { _, part -> "part_${part.id}" }) { index, part ->
                     val entry = vaultById[part.id]
                     Surface(
-                        color = CinemaSlate,
+                        color = colors.slate,
                         shape = RoundedCornerShape(18.dp),
-                        border = BorderStroke(1.dp, CinemaBorderSubtle),
+                        border = BorderStroke(1.dp, colors.borderSubtle),
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp)
@@ -196,7 +193,7 @@ fun CollectionDetailScreen(
                                     Text(
                                         text = "#${index + 1}",
                                         style = MaterialTheme.typography.labelLarge,
-                                        color = CinemaGold
+                                        color = colors.gold
                                     )
                                     if (part.criticScore > 0.0) {
                                         RatingPill(score = part.criticScore)
@@ -204,20 +201,20 @@ fun CollectionDetailScreen(
                                     Text(
                                         text = "${part.releaseYear}",
                                         style = MaterialTheme.typography.labelMedium,
-                                        color = CinemaSilver
+                                        color = colors.silver
                                     )
                                 }
                                 Text(
                                     text = part.title,
                                     style = MaterialTheme.typography.titleLarge,
-                                    color = CinemaAlabaster,
+                                    color = colors.alabaster,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
                                     text = part.synopsis,
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = CinemaSilver,
+                                    color = colors.silver,
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis
                                 )

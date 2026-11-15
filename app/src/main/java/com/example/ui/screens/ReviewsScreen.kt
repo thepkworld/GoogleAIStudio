@@ -55,15 +55,7 @@ import com.example.ui.components.CinemaPosterArtwork
 import com.example.ui.components.EmptyVaultState
 import com.example.ui.components.RatingPill
 import com.example.ui.components.StatusPill
-import com.example.ui.theme.CinemaAlabaster
-import com.example.ui.theme.CinemaBorderSubtle
-import com.example.ui.theme.CinemaCrimson
-import com.example.ui.theme.CinemaGold
-import com.example.ui.theme.CinemaObsidian
-import com.example.ui.theme.CinemaSilver
-import com.example.ui.theme.CinemaSlate
-import com.example.ui.theme.CinemaSlateElevated
-import java.util.Locale
+import com.example.ui.theme.CinemaTheme
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -76,6 +68,7 @@ fun ReviewsScreen(
     onBrowseClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = CinemaTheme.colors
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
@@ -84,9 +77,9 @@ fun ReviewsScreen(
         // Rating Distribution & Taste Profile Card
         item(key = "reviews_analytics") {
             Surface(
-                color = CinemaSlate,
+                color = colors.slate,
                 shape = RoundedCornerShape(22.dp),
-                border = BorderStroke(1.dp, CinemaGold.copy(alpha = 0.25f)),
+                border = BorderStroke(1.dp, colors.gold.copy(alpha = 0.25f)),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
@@ -102,12 +95,12 @@ fun ReviewsScreen(
                             Text(
                                 text = "CRITIC JOURNAL",
                                 style = MaterialTheme.typography.labelMedium,
-                                color = CinemaGold
+                                color = colors.gold
                             )
                             Text(
                                 text = "${stats.totalReviews} Reviews · ${stats.ratedCount} Rated",
                                 style = MaterialTheme.typography.headlineSmall,
-                                color = CinemaAlabaster
+                                color = colors.alabaster
                             )
                         }
                         if (stats.ratedCount > 0) {
@@ -123,7 +116,7 @@ fun ReviewsScreen(
                             Text(
                                 text = "TOP WATCHED GENRES",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = CinemaSilver
+                                color = colors.silver
                             )
                             FlowRow(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -131,14 +124,14 @@ fun ReviewsScreen(
                             ) {
                                 stats.topGenres.forEach { (genre, count) ->
                                     Surface(
-                                        color = CinemaSlateElevated,
+                                        color = colors.slateElevated,
                                         shape = RoundedCornerShape(8.dp),
-                                        border = BorderStroke(1.dp, CinemaBorderSubtle)
+                                        border = BorderStroke(1.dp, colors.borderSubtle)
                                     ) {
                                         Text(
                                             text = "$genre ($count)",
                                             style = MaterialTheme.typography.labelMedium,
-                                            color = CinemaAlabaster,
+                                            color = colors.alabaster,
                                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
                                         )
                                     }
@@ -160,10 +153,10 @@ fun ReviewsScreen(
                         onClick = { onFilterChange(filter) },
                         label = { Text(filter.label) },
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = CinemaGold,
-                            selectedLabelColor = CinemaObsidian,
-                            containerColor = CinemaSlate,
-                            labelColor = CinemaSilver
+                            selectedContainerColor = colors.gold,
+                            selectedLabelColor = colors.onGold,
+                            containerColor = colors.slate,
+                            labelColor = colors.silver
                         )
                     )
                 }
@@ -193,6 +186,7 @@ fun ReviewsScreen(
 
 @Composable
 private fun RatingHistogramChart(buckets: List<Int>) {
+    val colors = CinemaTheme.colors
     val labels = listOf("1–2", "3–4", "5–6", "7–8", "9–10")
     val maxCount = (buckets.maxOrNull() ?: 1).coerceAtLeast(1)
 
@@ -214,16 +208,16 @@ private fun RatingHistogramChart(buckets: List<Int>) {
                 val y = size.height - barHeight
 
                 drawRoundRect(
-                    color = CinemaSlateElevated,
+                    color = colors.slateElevated,
                     topLeft = Offset(x, 0f),
                     size = Size(barWidth, size.height),
                     cornerRadius = CornerRadius(10.dp.toPx(), 10.dp.toPx())
                 )
 
                 val brush = if (value > 0) {
-                    Brush.verticalGradient(listOf(CinemaGold, CinemaGold.copy(alpha = 0.45f)))
+                    Brush.verticalGradient(listOf(colors.gold, colors.gold.copy(alpha = 0.45f)))
                 } else {
-                    Brush.verticalGradient(listOf(CinemaBorderSubtle, CinemaBorderSubtle))
+                    Brush.verticalGradient(listOf(colors.borderSubtle, colors.borderSubtle))
                 }
                 drawRoundRect(
                     brush = brush,
@@ -246,12 +240,12 @@ private fun RatingHistogramChart(buckets: List<Int>) {
                     Text(
                         text = "${buckets.getOrElse(idx) { 0 }}",
                         style = MaterialTheme.typography.labelMedium,
-                        color = if ((buckets.getOrElse(idx) { 0 }) > 0) CinemaGold else CinemaSilver
+                        color = if ((buckets.getOrElse(idx) { 0 }) > 0) colors.gold else colors.silver
                     )
                     Text(
                         text = label,
                         style = MaterialTheme.typography.labelSmall,
-                        color = CinemaSilver.copy(alpha = 0.75f)
+                        color = colors.silver.copy(alpha = 0.75f)
                     )
                 }
             }
@@ -264,12 +258,13 @@ private fun ReviewJournalCard(
     entry: VaultEntry,
     onClick: () -> Unit
 ) {
+    val colors = CinemaTheme.colors
     var revealSpoiler by remember(entry.id) { mutableStateOf(!entry.containsSpoilers) }
 
     Surface(
-        color = CinemaSlate,
+        color = colors.slate,
         shape = RoundedCornerShape(18.dp),
-        border = BorderStroke(1.dp, CinemaBorderSubtle),
+        border = BorderStroke(1.dp, colors.borderSubtle),
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
@@ -298,14 +293,14 @@ private fun ReviewJournalCard(
                     Text(
                         text = entry.title,
                         style = MaterialTheme.typography.titleLarge,
-                        color = CinemaAlabaster,
+                        color = colors.alabaster,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = "${entry.releaseYear} · ${entry.directorOrCreator}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = CinemaSilver,
+                        color = colors.silver,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -322,16 +317,16 @@ private fun ReviewJournalCard(
                 Text(
                     text = entry.reviewTitle,
                     style = MaterialTheme.typography.titleMedium,
-                    color = CinemaGold,
+                    color = colors.gold,
                     fontWeight = FontWeight.Bold
                 )
             }
 
             if (entry.containsSpoilers && !revealSpoiler) {
                 Surface(
-                    color = CinemaCrimson.copy(alpha = 0.14f),
+                    color = colors.crimson.copy(alpha = 0.14f),
                     shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, CinemaCrimson.copy(alpha = 0.4f)),
+                    border = BorderStroke(1.dp, colors.crimson.copy(alpha = 0.4f)),
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
@@ -345,14 +340,14 @@ private fun ReviewJournalCard(
                         Icon(
                             imageVector = Icons.Rounded.Visibility,
                             contentDescription = null,
-                            tint = CinemaCrimson,
+                            tint = colors.crimson,
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "Spoiler Alert · Tap to reveal review",
                             style = MaterialTheme.typography.labelLarge,
-                            color = CinemaCrimson
+                            color = colors.crimson
                         )
                     }
                 }
@@ -361,7 +356,7 @@ private fun ReviewJournalCard(
                     Text(
                         text = entry.reviewBody,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = CinemaAlabaster.copy(alpha = 0.92f)
+                        color = colors.alabaster.copy(alpha = 0.92f)
                     )
                 }
 
@@ -370,14 +365,14 @@ private fun ReviewJournalCard(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(10.dp))
-                            .background(CinemaSlateElevated)
+                            .background(colors.slateElevated)
                             .padding(12.dp),
                         verticalAlignment = Alignment.Top
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.FormatQuote,
                             contentDescription = null,
-                            tint = CinemaGold,
+                            tint = colors.gold,
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
@@ -385,7 +380,7 @@ private fun ReviewJournalCard(
                             text = "\"${entry.favoriteQuote}\"",
                             style = MaterialTheme.typography.bodySmall,
                             fontStyle = FontStyle.Italic,
-                            color = CinemaSilver
+                            color = colors.silver
                         )
                     }
                 }
@@ -401,14 +396,14 @@ private fun ReviewJournalCard(
                         Icon(
                             imageVector = Icons.Rounded.VisibilityOff,
                             contentDescription = null,
-                            tint = CinemaSilver,
+                            tint = colors.silver,
                             modifier = Modifier.size(14.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = "Hide spoilers",
                             style = MaterialTheme.typography.labelSmall,
-                            color = CinemaSilver
+                            color = colors.silver
                         )
                     }
                 }

@@ -1,13 +1,18 @@
 package com.example.ui
 
+import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.auth.AuthCancelledException
+import com.example.auth.AuthSessionManager
+import com.example.auth.AuthUserSummary
 import com.example.data.catalog.CatalogRepository
 import com.example.data.model.CatalogTitle
 import com.example.data.model.CatalogViewMode
 import com.example.data.model.CollectionDetail
 import com.example.data.model.CollectionSummary
+import com.example.data.model.DataSourceOrigin
 import com.example.data.model.DiscoverSort
 import com.example.data.model.MediaType
 import com.example.data.model.OttPlatform
@@ -21,6 +26,10 @@ import com.example.data.model.TmdbSection
 import com.example.data.model.VaultEntry
 import com.example.data.model.WatchStatus
 import com.example.data.omdb.OmdbRepository
+import com.example.data.portability.VaultPortabilityManager
+import com.example.data.preferences.AppPreferencesRepository
+import com.example.data.preferences.AppPreferencesState
+import com.example.data.remote.VaultCloudRepository
 import com.example.data.repository.UnifiedMediaService
 import com.example.data.repository.VaultRepository
 import com.example.data.tmdb.TmdbRepository
@@ -50,6 +59,12 @@ sealed interface UiState<out T> {
     data object Loading : UiState<Nothing>
     data class Success<T>(val data: T) : UiState<T>
     data class Error(val message: String) : UiState<Nothing>
+}
+
+enum class ApiConnectionStatus(val label: String) {
+    TMDB_OMDB_LIVE("TMDB + OMDb"),
+    OMDB_FALLBACK("OMDb Fallback"),
+    OFFLINE("Offline Curated")
 }
 
 enum class MediaFilter(val label: String) {
@@ -213,7 +228,10 @@ data class BrowseUiState(
 class VaultViewModel(
     private val repository: VaultRepository,
     private val tmdbRepository: TmdbRepository = TmdbRepository(),
-    private val omdbRepository: OmdbRepository = OmdbRepository()
+    private val omdbRepository: OmdbRepository = OmdbRepository(),
+    private val cloudRepository: VaultCloudRepository? = null,
+    private val preferencesRepository: AppPreferencesRepository? = null,
+    private val authSessionManager: AuthSessionManager? = null
 ) : ViewModel() {
 
     private val unifiedMediaService = UnifiedMediaService(
@@ -222,6 +240,9 @@ class VaultViewModel(
     )
 
     private val localCatalogTitles: List<CatalogTitle> = CatalogRepository.allTitles()
+    private var omdbBrowsePool: List<CatalogTitle> = emptyList()
+    private var omdbSearchResultsPool: List<CatalogTitle> = emptyList()
+    private var lastOmdbSearchQuery: String = ""
     val localGenres: List<String> = CatalogRepository.allGenres
 
     // Browse filters
@@ -306,6 +327,49 @@ class VaultViewModel(
     private val _isMutating = MutableStateFlow(false)
     val isMutating: StateFlow<Boolean> = _isMutating.asStateFlow()
 
+    // Preferences, Onboarding & Firebase Auth/Sync state
+    private val _preferencesLoaded = MutableStateFlow(preferencesRepository == null)
+    val preferencesLoaded: StateFlow<Boolean> = _preferencesLoaded.asStateFlow()
+
+    private val _preferencesState = MutableStateFlow(
+        if (preferencesRepository == null) {
+            AppPreferencesState(isDarkTheme = true, hasCompletedOnboarding = true)
+        } else {
+            AppPreferencesState()
+        }
+    )
+    val preferencesState: StateFlow<AppPreferencesState> = _preferencesState.asStateFlow()
+
+    private val _authUser = MutableStateFlow(authSessionManager?.currentUserSummary())
+    val authUser: StateFlow<AuthUserSummary?> = _authUser.asStateFlow()
+
+    private val _isAuthBusy = MutableStateFlow(false)
+    val isAuthBusy: StateFlow<Boolean> = _isAuthBusy.asStateFlow()
+
+    private val _authErrorMessage = MutableStateFlow<String?>(null)
+    val authErrorMessage: StateFlow<String?> = _authErrorMessage.asStateFlow()
+
+    private val _isSyncingCloud = MutableStateFlow(false)
+    val isSyncingCloud: StateFlow<Boolean> = _isSyncingCloud.asStateFlow()
+
+    private val _pendingGuestMergeCount = MutableStateFlow(0)
+    val pendingGuestMergeCount: StateFlow<Int> = _pendingGuestMergeCount.asStateFlow()
+
+    val apiConnectionStatus: StateFlow<ApiConnectionStatus> = combine(
+        _homeUiState,
+        _browseUiState
+    ) { home, browse ->
+        when {
+            home.isLiveTmdb || browse.isLiveTmdb -> ApiConnectionStatus.TMDB_OMDB_LIVE
+            home.isLiveOmdb || browse.isLiveOmdb -> ApiConnectionStatus.OMDB_FALLBACK
+            else -> ApiConnectionStatus.OFFLINE
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+        initialValue = ApiConnectionStatus.OFFLINE
+    )
+
     private var searchJob: Job? = null
     private var sectionJob: Job? = null
     private var ottJob: Job? = null
@@ -313,8 +377,32 @@ class VaultViewModel(
     private var personJob: Job? = null
     private var collectionJob: Job? = null
     private var seasonJob: Job? = null
+    private var cloudSyncJob: Job? = null
 
     init {
+        if (preferencesRepository != null) {
+            viewModelScope.launch {
+                preferencesRepository.preferencesFlow.collect { state ->
+                    _preferencesState.value = state
+                    _preferencesLoaded.value = true
+                }
+            }
+        }
+        if (authSessionManager != null) {
+            viewModelScope.launch {
+                authSessionManager.observeAuthUser().collect { user ->
+                    _authUser.value = user
+                    cloudSyncJob?.cancel()
+                    if (user != null) {
+                        preferencesRepository?.setOnboardingCompleted(completed = true, isGuest = false)
+                        startCloudSyncForUser(user.uid)
+                    } else {
+                        _pendingGuestMergeCount.value = 0
+                    }
+                }
+            }
+        }
+
         if (tmdbRepository.hasConfiguredApiKey()) {
             loadInitialTmdbFeeds()
         } else if (omdbRepository.hasConfiguredApiKey()) {
@@ -714,8 +802,14 @@ class VaultViewModel(
 
             unifiedMediaService.fetchOmdbFallbackHomeFeeds()
                 .onSuccess { feeds ->
-                    val browsePool = (feeds.trendingNow + feeds.bollywoodMovies + feeds.classicMovies)
-                        .distinctBy { it.id }
+                    val browsePool = (
+                        feeds.trendingNow +
+                            feeds.bollywoodMovies +
+                            feeds.hollywoodMovies +
+                            feeds.topRatedMovies +
+                            feeds.classicMovies
+                        ).distinctBy { it.id }
+                    omdbBrowsePool = browsePool
                     val filteredBrowse = filterAndSortTitlesLocally(
                         titles = browsePool.ifEmpty { localCatalogTitles },
                         mediaFilter = _browseMediaFilter.value,
@@ -803,8 +897,12 @@ class VaultViewModel(
         } ?: MediaFilter.ALL
         _browseMediaFilter.value = adjustedMedia
 
-        if (!tmdbRepository.hasConfiguredApiKey()) {
-            refreshOfflineFilteredBrowse()
+        if (!tmdbRepository.hasConfiguredApiKey() || !_browseUiState.value.isLiveTmdb) {
+            if (_browseQuery.value.isNotBlank() && omdbRepository.hasConfiguredApiKey()) {
+                triggerSearch(_browseQuery.value)
+            } else {
+                refreshOfflineFilteredBrowse()
+            }
             return
         }
 
@@ -1032,6 +1130,11 @@ class VaultViewModel(
             _browseUiState.update { it.copy(isLoading = true, errorMessage = null) }
             val activeScope = _browseUiState.value.searchScope
             unifiedMediaService.searchWithFallback(trimmed, activeScope, page = 1).onSuccess { (bundle, origin) ->
+                val usingTmdb = origin == DataSourceOrigin.TMDB_WITH_OMDB
+                if (!usingTmdb) {
+                    omdbSearchResultsPool = bundle.titles
+                    lastOmdbSearchQuery = trimmed
+                }
                 val state = _browseUiState.value
                 val processedTitles = filterAndSortTitlesLocally(
                     titles = bundle.titles,
@@ -1039,7 +1142,6 @@ class VaultViewModel(
                     selectedGenres = state.selectedGenres,
                     sort = state.discoverSort
                 )
-                val usingTmdb = origin == com.example.data.model.DataSourceOrigin.TMDB_WITH_OMDB
                 _browseUiState.update { current ->
                     current.copy(
                         isLoading = false,
@@ -1053,12 +1155,33 @@ class VaultViewModel(
                         totalPages = bundle.totalPages
                     )
                 }
+                if (!usingTmdb) {
+                    _homeUiState.update { it.copy(isLiveTmdb = false, isLiveOmdb = true) }
+                }
             }.onFailure { err ->
-                _browseUiState.update { state ->
-                    state.copy(
-                        isLoading = false,
-                        errorMessage = err.localizedMessage ?: "Search failed"
-                    )
+                val isNotFound = err.localizedMessage?.contains("not found", ignoreCase = true) == true
+                if (isNotFound) {
+                    _browseUiState.update { state ->
+                        state.copy(
+                            isLoading = false,
+                            errorMessage = null,
+                            sectionTitles = emptyList(),
+                            searchPeople = emptyList(),
+                            searchCollections = emptyList(),
+                            currentPage = 1,
+                            totalPages = 1
+                        )
+                    }
+                } else {
+                    omdbSearchResultsPool = emptyList()
+                    lastOmdbSearchQuery = ""
+                    refreshOfflineFilteredBrowse()
+                    _browseUiState.update { state ->
+                        state.copy(
+                            isLoading = false,
+                            errorMessage = err.localizedMessage ?: "Search unavailable"
+                        )
+                    }
                 }
             }
         }
@@ -1067,7 +1190,17 @@ class VaultViewModel(
     fun updateBrowseMediaFilter(filter: MediaFilter) {
         _browseMediaFilter.value = filter
         if (!tmdbRepository.hasConfiguredApiKey() || !_browseUiState.value.isLiveTmdb) {
-            refreshOfflineFilteredBrowse()
+            if (_browseQuery.value.isNotBlank() && omdbRepository.hasConfiguredApiKey()) {
+                val nextScope = when (filter) {
+                    MediaFilter.ALL -> SearchScope.MULTI
+                    MediaFilter.MOVIES -> SearchScope.MOVIES
+                    MediaFilter.SERIES -> SearchScope.SERIES
+                }
+                _browseUiState.update { it.copy(searchScope = nextScope) }
+                triggerSearch(_browseQuery.value)
+            } else {
+                refreshOfflineFilteredBrowse()
+            }
             return
         }
         if (_browseQuery.value.isNotBlank()) {
@@ -1105,7 +1238,10 @@ class VaultViewModel(
             _browseUiState.update { it.copy(isLoadingMore = true) }
             val query = _browseQuery.value.trim()
             if (query.isNotEmpty()) {
-                unifiedMediaService.searchWithFallback(query, state.searchScope, page = nextPage).onSuccess { (bundle, _) ->
+                unifiedMediaService.searchWithFallback(query, state.searchScope, page = nextPage).onSuccess { (bundle, origin) ->
+                    if (origin == DataSourceOrigin.OMDB_FALLBACK) {
+                        omdbSearchResultsPool = (omdbSearchResultsPool + bundle.titles).distinctBy { it.id }
+                    }
                     val filteredBatch = filterAndSortTitlesLocally(
                         titles = bundle.titles,
                         mediaFilter = _browseMediaFilter.value,
@@ -1162,16 +1298,28 @@ class VaultViewModel(
     }
 
     private fun refreshOfflineFilteredBrowse() {
-        val query = _browseQuery.value.trim().lowercase()
+        val rawQuery = _browseQuery.value.trim()
+        val query = rawQuery.lowercase()
         val mediaFilter = _browseMediaFilter.value
         val state = _browseUiState.value
 
-        val queryMatched = localCatalogTitles.filter { item ->
-            query.isEmpty() ||
-                item.title.lowercase().contains(query) ||
-                item.directorOrCreator.lowercase().contains(query) ||
-                item.genres.any { it.lowercase().contains(query) } ||
-                item.cast.any { it.actor.lowercase().contains(query) }
+        val sourcePool = when {
+            rawQuery.isNotEmpty() && state.isLiveOmdb && omdbSearchResultsPool.isNotEmpty() &&
+                lastOmdbSearchQuery.equals(rawQuery, ignoreCase = true) -> omdbSearchResultsPool
+            rawQuery.isEmpty() && state.isLiveOmdb && omdbBrowsePool.isNotEmpty() -> omdbBrowsePool
+            else -> localCatalogTitles
+        }
+
+        val queryMatched = if (sourcePool === omdbSearchResultsPool) {
+            sourcePool
+        } else {
+            sourcePool.filter { item ->
+                query.isEmpty() ||
+                    item.title.lowercase().contains(query) ||
+                    item.directorOrCreator.lowercase().contains(query) ||
+                    item.genres.any { it.lowercase().contains(query) } ||
+                    item.cast.any { it.actor.lowercase().contains(query) }
+            }
         }
         val finalTitles = filterAndSortTitlesLocally(
             titles = queryMatched,
@@ -1183,8 +1331,8 @@ class VaultViewModel(
         _browseUiState.update { current ->
             current.copy(
                 sectionTitles = finalTitles,
-                currentPage = 1,
-                totalPages = 1
+                currentPage = if (sourcePool === omdbSearchResultsPool) current.currentPage else 1,
+                totalPages = if (sourcePool === omdbSearchResultsPool) current.totalPages else 1
             )
         }
     }
@@ -1370,7 +1518,8 @@ class VaultViewModel(
                 isPriority = isPriority
             )
             _isMutating.value = false
-            result.onSuccess {
+            result.onSuccess { savedId ->
+                mirrorEntryToCloud(savedId)
                 val msg = if (targetStatus == WatchStatus.WANT_TO_WATCH) {
                     "Added \"${catalogTitle.title}\" to Bucketlist"
                 } else {
@@ -1394,6 +1543,7 @@ class VaultViewModel(
                 rewatchCount = entry.rewatchCount
             )
             result.onSuccess {
+                mirrorEntryToCloud(entry.id)
                 _snackbarEvents.tryEmit(
                     if (nextPriority) "Pinned \"${entry.title}\" to Up Next"
                     else "Removed Up Next pin"
@@ -1423,6 +1573,7 @@ class VaultViewModel(
                 rewatchCount = entry.rewatchCount
             )
             result.onSuccess {
+                mirrorEntryToCloud(entry.id)
                 _snackbarEvents.tryEmit("Moved \"${entry.title}\" to Watched")
             }.onFailure { e ->
                 _snackbarEvents.tryEmit(e.localizedMessage ?: "Failed to mark watched")
@@ -1440,6 +1591,7 @@ class VaultViewModel(
                 rewatchCount = entry.rewatchCount
             )
             result.onSuccess {
+                mirrorEntryToCloud(entry.id)
                 _snackbarEvents.tryEmit("Moved \"${entry.title}\" to Bucketlist")
             }.onFailure { e ->
                 _snackbarEvents.tryEmit(e.localizedMessage ?: "Failed to move to Bucketlist")
@@ -1457,7 +1609,9 @@ class VaultViewModel(
                 episodesWatched = clamped,
                 rewatchCount = entry.rewatchCount
             )
-            result.onFailure { e ->
+            result.onSuccess {
+                mirrorEntryToCloud(entry.id)
+            }.onFailure { e ->
                 _snackbarEvents.tryEmit(e.localizedMessage ?: "Failed to update episode progress")
             }
         }
@@ -1472,7 +1626,9 @@ class VaultViewModel(
                 episodesWatched = entry.episodesWatched,
                 rewatchCount = newRewatchCount.coerceIn(0L, 1000L)
             )
-            result.onFailure { e ->
+            result.onSuccess {
+                mirrorEntryToCloud(entry.id)
+            }.onFailure { e ->
                 _snackbarEvents.tryEmit(e.localizedMessage ?: "Failed to update rewatch count")
             }
         }
@@ -1499,7 +1655,9 @@ class VaultViewModel(
         val cleanRating = rating.coerceIn(0, 10)
         viewModelScope.launch {
             _isMutating.value = true
+            val targetId: String?
             val result = if (existingEntry != null) {
+                targetId = existingEntry.id
                 repository.saveReviewAndRating(
                     catalogTitle = catalogTitle,
                     existingEntry = existingEntry,
@@ -1513,6 +1671,7 @@ class VaultViewModel(
                     watchedAt = watchedAtMillis
                 )
             } else if (catalogTitle != null) {
+                targetId = catalogTitle.id
                 repository.upsertFromCatalog(
                     catalogTitle = catalogTitle,
                     targetStatus = WatchStatus.WATCHED,
@@ -1522,10 +1681,12 @@ class VaultViewModel(
                     watchedAt = watchedAtMillis
                 ).map { Unit }
             } else {
+                targetId = null
                 Result.failure(IllegalStateException("Missing title"))
             }
             _isMutating.value = false
             result.onSuccess {
+                if (targetId != null) mirrorEntryToCloud(targetId)
                 val ratingNote = if (cleanRating > 0) " · $cleanRating/10 (${RatingScale.labelFor(cleanRating)})" else ""
                 _snackbarEvents.tryEmit("Marked \"$displayName\" as Seen$ratingNote")
                 onComplete()
@@ -1573,6 +1734,7 @@ class VaultViewModel(
             )
             _isMutating.value = false
             result.onSuccess {
+                mirrorEntryToCloud(entryId)
                 _snackbarEvents.tryEmit("Saved rating & review")
                 onComplete()
             }.onFailure { e ->
@@ -1620,6 +1782,7 @@ class VaultViewModel(
             )
             _isMutating.value = false
             result.onSuccess { id ->
+                mirrorEntryToCloud(id)
                 _snackbarEvents.tryEmit("Added \"$title\" to your Vault")
                 onCreated(id)
             }.onFailure { e ->
@@ -1634,10 +1797,186 @@ class VaultViewModel(
             val result = repository.deleteEntry(entry.id)
             _isMutating.value = false
             result.onSuccess {
+                deleteEntryFromCloud(entry.id)
                 _snackbarEvents.tryEmit("Removed \"${entry.title}\" from your Vault")
                 onDeleted()
             }.onFailure { e ->
                 _snackbarEvents.tryEmit(e.localizedMessage ?: "Failed to remove entry")
+            }
+        }
+    }
+
+    // ---- Onboarding, Auth, Theme & Cloud Sync ----
+
+    fun clearAuthError() {
+        _authErrorMessage.value = null
+    }
+
+    fun signInWithGoogle(activityContext: Context, isSignUp: Boolean = false) {
+        val manager = authSessionManager ?: return
+        viewModelScope.launch {
+            _isAuthBusy.value = true
+            _authErrorMessage.value = null
+            val res = manager.signInWithGoogle(activityContext)
+            _isAuthBusy.value = false
+            res.onSuccess { user ->
+                preferencesRepository?.setOnboardingCompleted(completed = true, isGuest = false)
+                _snackbarEvents.tryEmit(
+                    if (isSignUp) "Account created! Welcome, ${user.displayName}"
+                    else "Welcome back, ${user.displayName}"
+                )
+            }.onFailure { err ->
+                if (err is AuthCancelledException) {
+                    _authErrorMessage.value = null
+                } else {
+                    val msg = err.localizedMessage ?: "Google Sign-In failed."
+                    _authErrorMessage.value = msg
+                    _snackbarEvents.tryEmit(msg)
+                }
+            }
+        }
+    }
+
+    fun continueAsGuest() {
+        viewModelScope.launch {
+            _authErrorMessage.value = null
+            preferencesRepository?.setOnboardingCompleted(completed = true, isGuest = true)
+            _snackbarEvents.tryEmit("Exploring in Guest Mode — your Vault is saved on this device.")
+        }
+    }
+
+    fun signOut(context: Context) {
+        val manager = authSessionManager ?: return
+        cloudSyncJob?.cancel()
+        viewModelScope.launch {
+            _isAuthBusy.value = true
+            manager.signOut(context)
+            preferencesRepository?.setLastSyncedUid(null)
+            preferencesRepository?.setGuestMode(true)
+            _pendingGuestMergeCount.value = 0
+            _isAuthBusy.value = false
+            _snackbarEvents.tryEmit("Signed out. Switched to Guest Mode.")
+        }
+    }
+
+    fun setDarkTheme(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository?.setDarkTheme(enabled)
+        }
+    }
+
+    fun dismissGuestMergePrompt() {
+        _pendingGuestMergeCount.value = 0
+    }
+
+    fun syncLocalVaultToCloud() {
+        val uid = _authUser.value?.uid ?: return
+        val cloud = cloudRepository ?: return
+        viewModelScope.launch {
+            _isSyncingCloud.value = true
+            val localEntries = repository.getAllEntriesOnce().getOrDefault(emptyList())
+            val res = cloud.mergeLocalEntriesToCloud(uid, localEntries)
+            _isSyncingCloud.value = false
+            res.onSuccess { count ->
+                _pendingGuestMergeCount.value = 0
+                preferencesRepository?.setLastSyncedUid(uid)
+                _snackbarEvents.tryEmit("Synced $count ${if (count == 1) "title" else "titles"} to your cloud account")
+            }.onFailure { err ->
+                _snackbarEvents.tryEmit(err.localizedMessage ?: "Cloud sync failed")
+            }
+        }
+    }
+
+    suspend fun exportVaultJson(): Result<String> {
+        return repository.getAllEntriesOnce().map { entries ->
+            VaultPortabilityManager.exportToJson(
+                entries = entries,
+                stats = vaultStats.value
+            )
+        }
+    }
+
+    fun importVaultJson(rawJson: String) {
+        viewModelScope.launch {
+            _isMutating.value = true
+            val parsed = VaultPortabilityManager.importFromJson(rawJson)
+            parsed.onSuccess { pack ->
+                if (pack.entries.isEmpty()) {
+                    _isMutating.value = false
+                    _snackbarEvents.tryEmit("No entries found inside the selected JSON file.")
+                    return@onSuccess
+                }
+                val mergeRes = repository.importAndMergeEntries(pack.entries)
+                mergeRes.onSuccess { (inserted, updated) ->
+                    val uid = _authUser.value?.uid
+                    if (uid != null && cloudRepository != null) {
+                        cloudRepository.mergeLocalEntriesToCloud(uid, pack.entries)
+                    }
+                    _isMutating.value = false
+                    _snackbarEvents.tryEmit("Imported JSON: $inserted added, $updated updated.")
+                }.onFailure { err ->
+                    _isMutating.value = false
+                    _snackbarEvents.tryEmit(err.localizedMessage ?: "Failed to import JSON entries")
+                }
+            }.onFailure { err ->
+                _isMutating.value = false
+                _snackbarEvents.tryEmit(err.localizedMessage ?: "Invalid JSON backup file")
+            }
+        }
+    }
+
+    private fun startCloudSyncForUser(uid: String) {
+        val cloud = cloudRepository ?: return
+        cloudSyncJob?.cancel()
+        cloudSyncJob = viewModelScope.launch {
+            _isSyncingCloud.value = true
+            val initialCloud = cloud.fetchUserEntries(uid)
+            initialCloud.onSuccess { remoteList ->
+                if (remoteList.isNotEmpty()) {
+                    repository.mergeRemoteEntries(remoteList)
+                }
+                val localList = repository.getAllEntriesOnce().getOrDefault(emptyList())
+                val remoteIds = remoteList.map { it.id }.toSet()
+                val unsyncedLocal = localList.count { it.id !in remoteIds }
+                if (unsyncedLocal > 0) {
+                    _pendingGuestMergeCount.value = unsyncedLocal
+                }
+                preferencesRepository?.setLastSyncedUid(uid)
+            }.onFailure { err ->
+                Log.w(TAG, "Initial cloud fetch failed for $uid", err)
+            }
+            _isSyncingCloud.value = false
+
+            cloud.observeUserEntries(uid)
+                .catch { err ->
+                    if (err is CancellationException) throw err
+                    Log.w(TAG, "Cloud realtime listener error", err)
+                }
+                .collect { remoteUpdates ->
+                    if (remoteUpdates.isNotEmpty()) {
+                        repository.mergeRemoteEntries(remoteUpdates)
+                    }
+                }
+        }
+    }
+
+    private fun mirrorEntryToCloud(entryId: String) {
+        val uid = _authUser.value?.uid ?: return
+        val cloud = cloudRepository ?: return
+        viewModelScope.launch {
+            val entry = repository.getVaultEntry(entryId).getOrNull() ?: return@launch
+            cloud.upsertEntry(uid, entry).onFailure { err ->
+                Log.w(TAG, "Cloud upsert mirror failed for $entryId", err)
+            }
+        }
+    }
+
+    private fun deleteEntryFromCloud(entryId: String) {
+        val uid = _authUser.value?.uid ?: return
+        val cloud = cloudRepository ?: return
+        viewModelScope.launch {
+            cloud.deleteEntry(uid, entryId).onFailure { err ->
+                Log.w(TAG, "Cloud delete mirror failed for $entryId", err)
             }
         }
     }

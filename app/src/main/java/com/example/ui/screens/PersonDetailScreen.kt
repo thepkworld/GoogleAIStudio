@@ -48,13 +48,7 @@ import coil.request.ImageRequest
 import com.example.data.model.PersonDetail
 import com.example.data.model.VaultEntry
 import com.example.ui.components.CinemaPosterArtwork
-import com.example.ui.theme.CinemaAlabaster
-import com.example.ui.theme.CinemaBorderSubtle
-import com.example.ui.theme.CinemaGold
-import com.example.ui.theme.CinemaObsidian
-import com.example.ui.theme.CinemaSilver
-import com.example.ui.theme.CinemaSlate
-import com.example.ui.theme.CinemaSlateElevated
+import com.example.ui.theme.CinemaTheme
 
 @Composable
 fun PersonDetailScreen(
@@ -64,17 +58,18 @@ fun PersonDetailScreen(
     onBack: () -> Unit,
     onTitleClick: (String) -> Unit
 ) {
+    val colors = CinemaTheme.colors
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(CinemaObsidian)
+            .background(colors.obsidian)
     ) {
         if (isLoading && personDetail == null) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
-                CircularProgressIndicator(color = CinemaGold)
+                CircularProgressIndicator(color = colors.gold)
             }
         } else if (personDetail != null) {
             LazyColumn(
@@ -91,9 +86,9 @@ fun PersonDetailScreen(
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         Surface(
-                            color = CinemaSlate,
+                            color = colors.slate,
                             shape = CircleShape,
-                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f))
+                            border = BorderStroke(1.dp, colors.borderSubtle)
                         ) {
                             IconButton(
                                 onClick = onBack,
@@ -102,7 +97,7 @@ fun PersonDetailScreen(
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                                     contentDescription = "Back",
-                                    tint = CinemaAlabaster
+                                    tint = colors.alabaster
                                 )
                             }
                         }
@@ -123,7 +118,7 @@ fun PersonDetailScreen(
                                         .width(110.dp)
                                         .height(150.dp)
                                         .clip(RoundedCornerShape(18.dp))
-                                        .background(CinemaSlateElevated)
+                                        .background(colors.slateElevated)
                                 )
                             } else {
                                 Box(
@@ -131,13 +126,13 @@ fun PersonDetailScreen(
                                         .width(110.dp)
                                         .height(150.dp)
                                         .clip(RoundedCornerShape(18.dp))
-                                        .background(CinemaSlateElevated),
+                                        .background(colors.slateElevated),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
                                         imageVector = Icons.Rounded.Person,
                                         contentDescription = null,
-                                        tint = CinemaGold,
+                                        tint = colors.gold,
                                         modifier = Modifier.size(44.dp)
                                     )
                                 }
@@ -149,13 +144,13 @@ fun PersonDetailScreen(
                             ) {
                                 if (personDetail.knownForDepartment.isNotBlank()) {
                                     Surface(
-                                        color = CinemaGold.copy(alpha = 0.16f),
+                                        color = colors.gold.copy(alpha = 0.16f),
                                         shape = RoundedCornerShape(8.dp)
                                     ) {
                                         Text(
                                             text = personDetail.knownForDepartment.uppercase(),
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = CinemaGold,
+                                            color = colors.gold,
                                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                         )
                                     }
@@ -163,7 +158,7 @@ fun PersonDetailScreen(
                                 Text(
                                     text = personDetail.name,
                                     style = MaterialTheme.typography.displayMedium,
-                                    color = CinemaAlabaster
+                                    color = colors.alabaster
                                 )
                                 if (personDetail.birthday.isNotBlank()) {
                                     Text(
@@ -174,14 +169,14 @@ fun PersonDetailScreen(
                                             }
                                         },
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = CinemaSilver
+                                        color = colors.silver
                                     )
                                 }
                                 if (personDetail.placeOfBirth.isNotBlank()) {
                                     Text(
                                         text = personDetail.placeOfBirth,
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = CinemaSilver
+                                        color = colors.silver
                                     )
                                 }
                             }
@@ -197,12 +192,12 @@ fun PersonDetailScreen(
                         Text(
                             text = "Biography",
                             style = MaterialTheme.typography.headlineSmall,
-                            color = CinemaAlabaster
+                            color = colors.alabaster
                         )
                         Text(
                             text = personDetail.biography,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = CinemaSilver
+                            color = colors.silver
                         )
                     }
                 }
@@ -213,7 +208,7 @@ fun PersonDetailScreen(
                             Text(
                                 text = "Portraits",
                                 style = MaterialTheme.typography.headlineSmall,
-                                color = CinemaAlabaster,
+                                color = colors.alabaster,
                                 modifier = Modifier.padding(horizontal = 16.dp)
                             )
                             LazyRow(
@@ -232,7 +227,7 @@ fun PersonDetailScreen(
                                             .width(108.dp)
                                             .height(152.dp)
                                             .clip(RoundedCornerShape(14.dp))
-                                            .background(CinemaSlateElevated)
+                                            .background(colors.slateElevated)
                                     )
                                 }
                             }
@@ -245,7 +240,7 @@ fun PersonDetailScreen(
                         Text(
                             text = "Known For & Filmography (${personDetail.credits.size})",
                             style = MaterialTheme.typography.headlineSmall,
-                            color = CinemaAlabaster,
+                            color = colors.alabaster,
                             modifier = Modifier.padding(horizontal = 16.dp)
                         )
                     }
@@ -253,9 +248,9 @@ fun PersonDetailScreen(
                     items(personDetail.credits, key = { "credit_${it.id}" }) { credit ->
                         val entry = vaultById[credit.id]
                         Surface(
-                            color = CinemaSlate,
+                            color = colors.slate,
                             shape = RoundedCornerShape(16.dp),
-                            border = BorderStroke(1.dp, CinemaBorderSubtle),
+                            border = BorderStroke(1.dp, colors.borderSubtle),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp)
@@ -285,21 +280,21 @@ fun PersonDetailScreen(
                                     Text(
                                         text = credit.title,
                                         style = MaterialTheme.typography.titleMedium,
-                                        color = CinemaAlabaster,
+                                        color = colors.alabaster,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
                                     Text(
                                         text = "${credit.releaseYear} · ${credit.directorOrCreator}",
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = CinemaGold,
+                                        color = colors.gold,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
                                     Text(
                                         text = credit.synopsis,
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = CinemaSilver,
+                                        color = colors.silver,
                                         maxLines = 2,
                                         overflow = TextOverflow.Ellipsis
                                     )

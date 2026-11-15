@@ -6,7 +6,19 @@ import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.unit.dp
+
+val LocalCinemaColors = staticCompositionLocalOf { DarkCinemaColors }
+
+object CinemaTheme {
+    val colors: CinemaColors
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalCinemaColors.current
+}
 
 private val DarkCinemaColorScheme = darkColorScheme(
     primary = CinemaGold,
@@ -40,22 +52,32 @@ private val DarkCinemaColorScheme = darkColorScheme(
 
 private val LightArchiveColorScheme = lightColorScheme(
     primary = ArchiveGoldDeep,
-    onPrimary = ArchivePaper,
+    onPrimary = ArchiveOnGold,
     primaryContainer = ArchiveGoldSurface,
     onPrimaryContainer = ArchiveInk,
-    secondary = CinemaCrimson,
+    secondary = ArchiveCrimson,
     onSecondary = ArchivePaper,
-    secondaryContainer = CinemaCrimsonContainer,
-    onSecondaryContainer = CinemaAlabaster,
-    tertiary = CinemaEmerald,
+    secondaryContainer = ArchiveCrimsonContainer,
+    onSecondaryContainer = ArchiveCrimson,
+    tertiary = ArchiveEmerald,
     onTertiary = ArchivePaper,
+    tertiaryContainer = ArchiveEmeraldContainer,
+    onTertiaryContainer = ArchiveEmerald,
     background = ArchivePaper,
     onBackground = ArchiveInk,
-    surface = ArchivePaper,
+    surface = ArchiveVelvet,
     onSurface = ArchiveInk,
     surfaceVariant = ArchiveCard,
     onSurfaceVariant = ArchiveInkMuted,
-    outline = ArchiveInkMuted.copy(alpha = 0.35f)
+    surfaceContainerLowest = ArchivePaper,
+    surfaceContainerLow = ArchiveVelvet,
+    surfaceContainer = ArchiveCard,
+    surfaceContainerHigh = ArchiveElevated,
+    surfaceContainerHighest = ArchiveBorder,
+    outline = ArchiveBorder,
+    outlineVariant = ArchiveElevated,
+    error = ArchiveCrimson,
+    onError = ArchivePaper
 )
 
 val CineVaultShapes = Shapes(
@@ -72,11 +94,14 @@ fun CineVaultTheme(
     content: @Composable () -> Unit
 ) {
     val colorScheme = if (darkTheme) DarkCinemaColorScheme else LightArchiveColorScheme
+    val cinemaColors = if (darkTheme) DarkCinemaColors else LightArchiveColors
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = CineVaultTypography,
-        shapes = CineVaultShapes,
-        content = content
-    )
+    CompositionLocalProvider(LocalCinemaColors provides cinemaColors) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = CineVaultTypography,
+            shapes = CineVaultShapes,
+            content = content
+        )
+    }
 }

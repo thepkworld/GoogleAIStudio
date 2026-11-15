@@ -56,15 +56,7 @@ import com.example.ui.WatchedTimeFilter
 import com.example.ui.components.CinemaPosterArtwork
 import com.example.ui.components.EmptyVaultState
 import com.example.ui.components.formatWatchedDate
-import com.example.ui.theme.CinemaAlabaster
-import com.example.ui.theme.CinemaBorderSubtle
-import com.example.ui.theme.CinemaCrimson
-import com.example.ui.theme.CinemaEmerald
-import com.example.ui.theme.CinemaGold
-import com.example.ui.theme.CinemaObsidian
-import com.example.ui.theme.CinemaSilver
-import com.example.ui.theme.CinemaSlate
-import com.example.ui.theme.CinemaSlateElevated
+import com.example.ui.theme.CinemaTheme
 import kotlin.math.roundToInt
 
 @Composable
@@ -90,6 +82,7 @@ fun WatchedScreen(
     onBrowseClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = CinemaTheme.colors
     val hasActiveFilters = searchQuery.isNotBlank() ||
         selectedFilter != MediaFilter.ALL ||
         selectedTimeFilter != WatchedTimeFilter.ALL_TIME ||
@@ -105,9 +98,9 @@ fun WatchedScreen(
         // Slim Library Header + Jump to Stats Tab
         item(key = "watched_summary") {
             Surface(
-                color = CinemaSlate,
+                color = colors.slate,
                 shape = RoundedCornerShape(18.dp),
-                border = BorderStroke(1.dp, CinemaEmerald.copy(alpha = 0.28f)),
+                border = BorderStroke(1.dp, colors.emerald.copy(alpha = 0.28f)),
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("library_summary_card")
@@ -126,18 +119,18 @@ fun WatchedScreen(
                         Text(
                             text = "WATCHED LIBRARY",
                             style = MaterialTheme.typography.labelMedium,
-                            color = CinemaEmerald
+                            color = colors.emerald
                         )
                         Text(
                             text = "${stats.totalWatched} ${if (stats.totalWatched == 1) "Title" else "Titles"} Archived",
                             style = MaterialTheme.typography.headlineSmall,
-                            color = CinemaAlabaster
+                            color = colors.alabaster
                         )
                     }
                     Surface(
-                        color = CinemaGold.copy(alpha = 0.15f),
+                        color = colors.gold.copy(alpha = 0.15f),
                         shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, CinemaGold.copy(alpha = 0.35f)),
+                        border = BorderStroke(1.dp, colors.gold.copy(alpha = 0.35f)),
                         modifier = Modifier
                             .clip(RoundedCornerShape(12.dp))
                             .clickable(onClick = onOpenStats)
@@ -151,13 +144,13 @@ fun WatchedScreen(
                             Icon(
                                 imageVector = Icons.Rounded.Insights,
                                 contentDescription = null,
-                                tint = CinemaGold,
+                                tint = colors.gold,
                                 modifier = Modifier.size(16.dp)
                             )
                             Text(
                                 text = "View Stats",
                                 style = MaterialTheme.typography.labelMedium,
-                                color = CinemaGold,
+                                color = colors.gold,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -174,31 +167,31 @@ fun WatchedScreen(
                 placeholder = {
                     Text(
                         text = "Search watched titles, directors, reviews…",
-                        color = CinemaSilver.copy(alpha = 0.7f),
+                        color = colors.silver.copy(alpha = 0.7f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 },
                 leadingIcon = {
-                    Icon(Icons.Rounded.Search, contentDescription = null, tint = CinemaEmerald)
+                    Icon(Icons.Rounded.Search, contentDescription = null, tint = colors.emerald)
                 },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
                         IconButton(onClick = { onSearchQueryChange("") }) {
-                            Icon(Icons.Rounded.Clear, contentDescription = "Clear filter", tint = CinemaSilver)
+                            Icon(Icons.Rounded.Clear, contentDescription = "Clear filter", tint = colors.silver)
                         }
                     }
                 },
                 singleLine = true,
                 shape = RoundedCornerShape(14.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = CinemaEmerald,
-                    unfocusedBorderColor = CinemaBorderSubtle,
-                    focusedContainerColor = CinemaSlate,
-                    unfocusedContainerColor = CinemaSlate,
-                    focusedTextColor = CinemaAlabaster,
-                    unfocusedTextColor = CinemaAlabaster,
-                    cursorColor = CinemaEmerald
+                    focusedBorderColor = colors.emerald,
+                    unfocusedBorderColor = colors.borderSubtle,
+                    focusedContainerColor = colors.slate,
+                    unfocusedContainerColor = colors.slate,
+                    focusedTextColor = colors.alabaster,
+                    unfocusedTextColor = colors.alabaster,
+                    cursorColor = colors.emerald
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -223,10 +216,10 @@ fun WatchedScreen(
                                 onClick = { onFilterChange(filter) },
                                 label = { Text(filter.label) },
                                 colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = CinemaEmerald,
-                                    selectedLabelColor = CinemaObsidian,
-                                    containerColor = CinemaSlate,
-                                    labelColor = CinemaSilver
+                                    selectedContainerColor = colors.emerald,
+                                    selectedLabelColor = MaterialTheme.colorScheme.onTertiary,
+                                    containerColor = colors.slate,
+                                    labelColor = colors.silver
                                 )
                             )
                         }
@@ -237,11 +230,11 @@ fun WatchedScreen(
                             Icon(
                                 imageVector = Icons.Rounded.FilterListOff,
                                 contentDescription = null,
-                                tint = CinemaGold,
+                                tint = colors.gold,
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Reset", color = CinemaGold, style = MaterialTheme.typography.labelMedium)
+                            Text("Reset", color = colors.gold, style = MaterialTheme.typography.labelMedium)
                         }
                     }
                 }
@@ -251,9 +244,9 @@ fun WatchedScreen(
                     items(WatchedTimeFilter.entries, key = { it.name }) { tf ->
                         val selected = selectedTimeFilter == tf
                         Surface(
-                            color = if (selected) CinemaGold.copy(alpha = 0.18f) else CinemaSlate,
+                            color = if (selected) colors.gold.copy(alpha = 0.18f) else colors.slate,
                             shape = RoundedCornerShape(10.dp),
-                            border = BorderStroke(1.dp, if (selected) CinemaGold else CinemaBorderSubtle),
+                            border = BorderStroke(1.dp, if (selected) colors.gold else colors.borderSubtle),
                             modifier = Modifier
                                 .clip(RoundedCornerShape(10.dp))
                                 .clickable { onTimeFilterChange(tf) }
@@ -262,7 +255,7 @@ fun WatchedScreen(
                             Text(
                                 text = tf.label,
                                 style = MaterialTheme.typography.labelMedium,
-                                color = if (selected) CinemaGold else CinemaSilver,
+                                color = if (selected) colors.gold else colors.silver,
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
                             )
                         }
@@ -274,9 +267,9 @@ fun WatchedScreen(
                     items(WatchedRatingFilter.entries, key = { it.name }) { rf ->
                         val selected = selectedRatingFilter == rf
                         Surface(
-                            color = if (selected) CinemaEmerald.copy(alpha = 0.18f) else CinemaSlate,
+                            color = if (selected) colors.emerald.copy(alpha = 0.18f) else colors.slate,
                             shape = RoundedCornerShape(10.dp),
-                            border = BorderStroke(1.dp, if (selected) CinemaEmerald else CinemaBorderSubtle),
+                            border = BorderStroke(1.dp, if (selected) colors.emerald else colors.borderSubtle),
                             modifier = Modifier
                                 .clip(RoundedCornerShape(10.dp))
                                 .clickable { onRatingFilterChange(rf) }
@@ -285,7 +278,7 @@ fun WatchedScreen(
                             Text(
                                 text = rf.label,
                                 style = MaterialTheme.typography.labelMedium,
-                                color = if (selected) CinemaEmerald else CinemaSilver,
+                                color = if (selected) colors.emerald else colors.silver,
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
                             )
                         }
@@ -298,9 +291,9 @@ fun WatchedScreen(
                         items(availableGenres, key = { "lib_genre_$it" }) { genre ->
                             val selected = selectedGenre == genre
                             Surface(
-                                color = if (selected) CinemaSlateElevated else CinemaSlate,
+                                color = if (selected) colors.slateElevated else colors.slate,
                                 shape = RoundedCornerShape(10.dp),
-                                border = BorderStroke(1.dp, if (selected) CinemaGold else CinemaBorderSubtle),
+                                border = BorderStroke(1.dp, if (selected) colors.gold else colors.borderSubtle),
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(10.dp))
                                     .clickable { onGenreChange(genre) }
@@ -308,7 +301,7 @@ fun WatchedScreen(
                                 Text(
                                     text = if (genre == "All") "Genre: All" else genre,
                                     style = MaterialTheme.typography.labelMedium,
-                                    color = if (selected) CinemaGold else CinemaSilver,
+                                    color = if (selected) colors.gold else colors.silver,
                                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
                                 )
                             }
@@ -321,11 +314,11 @@ fun WatchedScreen(
                     items(WatchedSort.entries, key = { it.name }) { sort ->
                         val selected = selectedSort == sort
                         Surface(
-                            color = if (selected) CinemaSlateElevated else CinemaSlate,
+                            color = if (selected) colors.slateElevated else colors.slate,
                             shape = RoundedCornerShape(10.dp),
                             border = BorderStroke(
                                 1.dp,
-                                if (selected) CinemaEmerald else CinemaBorderSubtle
+                                if (selected) colors.emerald else colors.borderSubtle
                             ),
                             modifier = Modifier
                                 .clip(RoundedCornerShape(10.dp))
@@ -334,7 +327,7 @@ fun WatchedScreen(
                             Text(
                                 text = "Sort: ${sort.label}",
                                 style = MaterialTheme.typography.labelMedium,
-                                color = if (selected) CinemaEmerald else CinemaSilver,
+                                color = if (selected) colors.emerald else colors.silver,
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
                             )
                         }
@@ -353,12 +346,12 @@ fun WatchedScreen(
                 Text(
                     text = if (hasActiveFilters) "Filtered Results" else "All Watched",
                     style = MaterialTheme.typography.titleSmall,
-                    color = CinemaAlabaster
+                    color = colors.alabaster
                 )
                 Text(
                     text = "${entries.size} ${if (entries.size == 1) "TITLE" else "TITLES"}",
                     style = MaterialTheme.typography.labelMedium,
-                    color = CinemaEmerald
+                    color = colors.emerald
                 )
             }
         }
@@ -393,20 +386,21 @@ private fun WatchedItemCard(
     entry: VaultEntry,
     onClick: () -> Unit
 ) {
+    val colors = CinemaTheme.colors
     val intScore = if (entry.userRating > 0.0) entry.userRating.roundToInt().coerceIn(1, 10) else 0
     val ratingWord = RatingScale.labelFor(intScore)
     val ratingTint = when {
-        intScore >= 9 -> CinemaGold
-        intScore >= 7 -> CinemaEmerald
-        intScore >= 5 -> CinemaAlabaster
-        intScore >= 1 -> CinemaCrimson
-        else -> CinemaSilver
+        intScore >= 9 -> colors.gold
+        intScore >= 7 -> colors.emerald
+        intScore >= 5 -> colors.alabaster
+        intScore >= 1 -> colors.crimson
+        else -> colors.silver
     }
 
     Surface(
-        color = CinemaSlate,
+        color = colors.slate,
         shape = RoundedCornerShape(18.dp),
-        border = BorderStroke(1.dp, CinemaBorderSubtle),
+        border = BorderStroke(1.dp, colors.borderSubtle),
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
@@ -468,13 +462,13 @@ private fun WatchedItemCard(
                         }
                     } else {
                         Surface(
-                            color = CinemaSlateElevated,
+                            color = colors.slateElevated,
                             shape = RoundedCornerShape(8.dp)
                         ) {
                             Text(
                                 text = "TAP TO RATE",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = CinemaSilver,
+                                color = colors.silver,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                             )
                         }
@@ -482,7 +476,7 @@ private fun WatchedItemCard(
 
                     if (entry.rewatchCount > 0) {
                         Surface(
-                            color = CinemaEmerald.copy(alpha = 0.14f),
+                            color = colors.emerald.copy(alpha = 0.14f),
                             shape = RoundedCornerShape(8.dp)
                         ) {
                             Row(
@@ -492,14 +486,14 @@ private fun WatchedItemCard(
                                 Icon(
                                     imageVector = Icons.Rounded.Repeat,
                                     contentDescription = null,
-                                    tint = CinemaEmerald,
+                                    tint = colors.emerald,
                                     modifier = Modifier.size(12.dp)
                                 )
                                 Spacer(modifier = Modifier.width(3.dp))
                                 Text(
                                     text = "${entry.rewatchCount}x",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = CinemaEmerald
+                                    color = colors.emerald
                                 )
                             }
                         }
@@ -509,7 +503,7 @@ private fun WatchedItemCard(
                 Text(
                     text = entry.title,
                     style = MaterialTheme.typography.titleLarge,
-                    color = CinemaAlabaster,
+                    color = colors.alabaster,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -517,7 +511,7 @@ private fun WatchedItemCard(
                 Text(
                     text = "${entry.releaseYear} · ${entry.directorOrCreator}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = CinemaSilver,
+                    color = colors.silver,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -527,14 +521,14 @@ private fun WatchedItemCard(
                         Icon(
                             imageVector = Icons.Rounded.CalendarMonth,
                             contentDescription = null,
-                            tint = CinemaSilver,
+                            tint = colors.silver,
                             modifier = Modifier.size(13.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = "Seen ${formatWatchedDate(entry.effectiveWatchedAt)}",
                             style = MaterialTheme.typography.labelSmall,
-                            color = CinemaSilver
+                            color = colors.silver
                         )
                     }
                 }
@@ -544,14 +538,14 @@ private fun WatchedItemCard(
                         Icon(
                             imageVector = Icons.Rounded.RateReview,
                             contentDescription = null,
-                            tint = CinemaGold,
+                            tint = colors.gold,
                             modifier = Modifier.size(13.dp)
                         )
                         Spacer(modifier = Modifier.width(5.dp))
                         Text(
                             text = entry.reviewTitle.ifBlank { entry.reviewBody },
                             style = MaterialTheme.typography.bodySmall,
-                            color = CinemaAlabaster.copy(alpha = 0.9f),
+                            color = colors.alabaster.copy(alpha = 0.9f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )

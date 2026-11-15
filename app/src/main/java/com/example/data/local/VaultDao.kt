@@ -11,11 +11,17 @@ interface VaultDao {
     @Query("SELECT * FROM vault_entries ORDER BY updatedAt DESC, createdAt DESC")
     fun observeAllEntries(): Flow<List<VaultEntryEntity>>
 
+    @Query("SELECT * FROM vault_entries ORDER BY updatedAt DESC, createdAt DESC")
+    suspend fun getAllEntriesOnce(): List<VaultEntryEntity>
+
     @Query("SELECT * FROM vault_entries WHERE id = :id LIMIT 1")
     suspend fun getEntryById(id: String): VaultEntryEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertEntry(entry: VaultEntryEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertEntries(entries: List<VaultEntryEntity>)
 
     @Query("DELETE FROM vault_entries WHERE id = :id")
     suspend fun deleteEntryById(id: String)

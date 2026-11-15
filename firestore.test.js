@@ -23,6 +23,7 @@ function validEntry(userId, overrides = {}) {
   return {
     userId,
     catalogId: "dune_part_two",
+    tmdbId: 693134,
     title: "Dune: Part Two",
     mediaType: "movie",
     status: "want_to_watch",
@@ -33,6 +34,12 @@ function validEntry(userId, overrides = {}) {
     runtimeOrSeasons: "2h 46m",
     synopsis: "Paul Atreides unites with Chani and the Fremen while seeking revenge.",
     posterKey: "scifi",
+    posterUrl: "https://image.tmdb.org/t/p/w500/dune2.jpg",
+    backdropUrl: "https://image.tmdb.org/t/p/w780/dune2_bg.jpg",
+    releaseDate: "2024-02-27",
+    language: "English",
+    studioOrNetwork: "Warner Bros. Pictures",
+    watchedAt: 0,
     userRating: 0.0,
     reviewTitle: "",
     reviewBody: "",
@@ -78,7 +85,7 @@ test("Unauthenticated user cannot list or read vaultEntries", async () => {
   await assertFails(unauthDb.collection("users").doc(ALICE_UID).collection("vaultEntries").doc("dune_part_two").get());
 });
 
-test("Authenticated owner can create, list, update review, and delete own vaultEntry", async () => {
+test("Authenticated owner can create, list, update review + watchedAt, and delete own vaultEntry", async () => {
   const aliceDb = testEnv.authenticatedContext(ALICE_UID).firestore();
   const docRef = aliceDb.collection("users").doc(ALICE_UID).collection("vaultEntries").doc("dune_part_two");
 
@@ -93,6 +100,7 @@ test("Authenticated owner can create, list, update review, and delete own vaultE
       reviewBody: "A towering theatrical experience.",
       favoriteQuote: "May thy knife chip and shatter.",
       containsSpoilers: false,
+      watchedAt: Date.now() - 5000,
       updatedAt: pastTimestamp(),
     })
   );
@@ -130,6 +138,12 @@ test("Rejects ghost fields, invalid rating bounds, invalid doc ID, and immutable
   await assertFails(
     aliceDb.collection("users").doc(ALICE_UID).collection("vaultEntries").doc("dune_part_two")
       .set(validEntry(ALICE_UID, { userRating: 11.0 }))
+  );
+
+  // Negative watchedAt
+  await assertFails(
+    aliceDb.collection("users").doc(ALICE_UID).collection("vaultEntries").doc("dune_part_two")
+      .set(validEntry(ALICE_UID, { watchedAt: -100 }))
   );
 
   // Invalid doc ID

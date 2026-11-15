@@ -183,10 +183,6 @@ class UnifiedMediaService(
             }
         }
 
-        if (scope == SearchScope.PEOPLE || scope == SearchScope.COLLECTIONS) {
-            return Result.failure(IllegalStateException("TMDB is unreachable for People/Collections search"))
-        }
-
         if (omdbRepository.hasConfiguredApiKey()) {
             val typeFilter = when (scope) {
                 SearchScope.MOVIES -> MediaType.MOVIE

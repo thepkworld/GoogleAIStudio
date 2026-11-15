@@ -68,14 +68,7 @@ import com.example.ui.VaultStats
 import com.example.ui.WatchlistSort
 import com.example.ui.components.CinemaPosterArtwork
 import com.example.ui.components.EmptyVaultState
-import com.example.ui.theme.CinemaAlabaster
-import com.example.ui.theme.CinemaBorderSubtle
-import com.example.ui.theme.CinemaEmerald
-import com.example.ui.theme.CinemaGold
-import com.example.ui.theme.CinemaObsidian
-import com.example.ui.theme.CinemaSilver
-import com.example.ui.theme.CinemaSlate
-import com.example.ui.theme.CinemaSlateElevated
+import com.example.ui.theme.CinemaTheme
 
 @Composable
 fun WatchlistScreen(
@@ -92,6 +85,7 @@ fun WatchlistScreen(
     onBrowseClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = CinemaTheme.colors
     var showSortDropdown by remember { mutableStateOf(false) }
 
     val movieWord = if (stats.watchlistMovies == 1) "Movie" else "Movies"
@@ -112,9 +106,9 @@ fun WatchlistScreen(
             // Summary Banner
             item(key = "watchlist_summary") {
                 Surface(
-                    color = CinemaSlate,
+                    color = colors.slate,
                     shape = RoundedCornerShape(20.dp),
-                    border = BorderStroke(1.dp, CinemaGold.copy(alpha = 0.25f)),
+                    border = BorderStroke(1.dp, colors.gold.copy(alpha = 0.25f)),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("bucketlist_summary_card")
@@ -133,29 +127,29 @@ fun WatchlistScreen(
                             Text(
                                 text = "BUCKETLIST",
                                 style = MaterialTheme.typography.labelMedium,
-                                color = CinemaGold
+                                color = colors.gold
                             )
                             Text(
                                 text = breakdownText,
                                 style = MaterialTheme.typography.headlineSmall,
-                                color = CinemaAlabaster,
+                                color = colors.alabaster,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
                                 text = "Special",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = CinemaSilver
+                                color = colors.silver
                             )
                         }
                         Spacer(modifier = Modifier.width(12.dp))
                         Surface(
-                            color = CinemaGold.copy(alpha = 0.14f),
+                            color = colors.gold.copy(alpha = 0.14f),
                             shape = RoundedCornerShape(14.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Rounded.BookmarkAdd,
                                 contentDescription = null,
-                                tint = CinemaGold,
+                                tint = colors.gold,
                                 modifier = Modifier
                                     .padding(14.dp)
                                     .size(28.dp)
@@ -176,10 +170,10 @@ fun WatchlistScreen(
                                 onClick = { onFilterChange(filter) },
                                 label = { Text(filter.label) },
                                 colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = CinemaGold,
-                                    selectedLabelColor = CinemaObsidian,
-                                    containerColor = CinemaSlate,
-                                    labelColor = CinemaSilver
+                                    selectedContainerColor = colors.gold,
+                                    selectedLabelColor = colors.onGold,
+                                    containerColor = colors.slate,
+                                    labelColor = colors.silver
                                 )
                             )
                         }
@@ -198,9 +192,9 @@ fun WatchlistScreen(
                                 label = "watchlist_sort_arrow"
                             )
                             Surface(
-                                color = CinemaSlate,
+                                color = colors.slate,
                                 shape = RoundedCornerShape(12.dp),
-                                border = BorderStroke(1.dp, CinemaGold.copy(alpha = 0.45f)),
+                                border = BorderStroke(1.dp, colors.gold.copy(alpha = 0.45f)),
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(48.dp)
@@ -223,13 +217,13 @@ fun WatchlistScreen(
                                         Icon(
                                             imageVector = Icons.AutoMirrored.Rounded.Sort,
                                             contentDescription = null,
-                                            tint = CinemaGold,
+                                            tint = colors.gold,
                                             modifier = Modifier.size(18.dp)
                                         )
                                         Text(
                                             text = "Sort: ${selectedSort.label}",
                                             style = MaterialTheme.typography.labelLarge,
-                                            color = CinemaAlabaster,
+                                            color = colors.alabaster,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
@@ -237,7 +231,7 @@ fun WatchlistScreen(
                                     Icon(
                                         imageVector = Icons.Rounded.KeyboardArrowDown,
                                         contentDescription = null,
-                                        tint = CinemaGold,
+                                        tint = colors.gold,
                                         modifier = Modifier
                                             .size(18.dp)
                                             .graphicsLayer { rotationZ = arrowRotation }
@@ -250,7 +244,7 @@ fun WatchlistScreen(
                                 onDismissRequest = { showSortDropdown = false },
                                 modifier = Modifier
                                     .width(220.dp)
-                                    .background(CinemaSlateElevated)
+                                    .background(colors.slateElevated)
                             ) {
                                 WatchlistSort.entries.forEach { sort ->
                                     val selected = selectedSort == sort
@@ -264,14 +258,14 @@ fun WatchlistScreen(
                                                 Text(
                                                     text = sort.label,
                                                     style = MaterialTheme.typography.bodyMedium,
-                                                    color = if (selected) CinemaGold else CinemaAlabaster,
+                                                    color = if (selected) colors.gold else colors.alabaster,
                                                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
                                                 )
                                                 if (selected) {
                                                     Icon(
                                                         imageVector = Icons.Rounded.Check,
                                                         contentDescription = null,
-                                                        tint = CinemaGold,
+                                                        tint = colors.gold,
                                                         modifier = Modifier.size(16.dp)
                                                     )
                                                 }
@@ -365,10 +359,11 @@ private fun BucketlistViewToggleButton(
     onCycle: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = CinemaTheme.colors
     Surface(
-        color = CinemaSlate,
+        color = colors.slate,
         shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, CinemaBorderSubtle),
+        border = BorderStroke(1.dp, colors.borderSubtle),
         modifier = modifier
             .height(48.dp)
             .clip(RoundedCornerShape(12.dp))
@@ -391,13 +386,13 @@ private fun BucketlistViewToggleButton(
                         CatalogViewMode.COMPACT -> Icons.Rounded.ViewAgenda
                     },
                     contentDescription = "Switch view: ${currentMode.label}",
-                    tint = CinemaGold,
+                    tint = colors.gold,
                     modifier = Modifier.size(18.dp)
                 )
                 Text(
                     text = if (currentMode == CatalogViewMode.GRID) "Tile" else currentMode.label,
                     style = MaterialTheme.typography.labelMedium,
-                    color = CinemaAlabaster
+                    color = colors.alabaster
                 )
             }
         }
@@ -411,6 +406,7 @@ private fun BucketlistGridCard(
     onMarkSeen: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = CinemaTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
@@ -420,9 +416,9 @@ private fun BucketlistGridCard(
     )
 
     Surface(
-        color = CinemaSlate,
+        color = colors.slate,
         shape = RoundedCornerShape(18.dp),
-        border = BorderStroke(1.dp, CinemaBorderSubtle),
+        border = BorderStroke(1.dp, colors.borderSubtle),
         modifier = modifier
             .graphicsLayer {
                 scaleX = scale
@@ -457,14 +453,14 @@ private fun BucketlistGridCard(
                 Text(
                     text = entry.title,
                     style = MaterialTheme.typography.titleSmall,
-                    color = CinemaAlabaster,
+                    color = colors.alabaster,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = "${entry.releaseYear}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = CinemaSilver
+                    color = colors.silver
                 )
             }
 
@@ -485,10 +481,11 @@ private fun BucketlistListCard(
     onClick: () -> Unit,
     onMarkSeen: () -> Unit
 ) {
+    val colors = CinemaTheme.colors
     Surface(
-        color = CinemaSlate,
+        color = colors.slate,
         shape = RoundedCornerShape(18.dp),
-        border = BorderStroke(1.dp, CinemaBorderSubtle),
+        border = BorderStroke(1.dp, colors.borderSubtle),
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
@@ -524,14 +521,14 @@ private fun BucketlistListCard(
                     Text(
                         text = entry.title,
                         style = MaterialTheme.typography.titleLarge,
-                        color = CinemaAlabaster,
+                        color = colors.alabaster,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = "${entry.releaseYear}",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = CinemaSilver
+                        color = colors.silver
                     )
                 }
 
@@ -551,10 +548,11 @@ private fun BucketlistCompactCard(
     onClick: () -> Unit,
     onMarkSeen: () -> Unit
 ) {
+    val colors = CinemaTheme.colors
     Surface(
-        color = CinemaSlate,
+        color = colors.slate,
         shape = RoundedCornerShape(14.dp),
-        border = BorderStroke(1.dp, CinemaBorderSubtle),
+        border = BorderStroke(1.dp, colors.borderSubtle),
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
@@ -590,14 +588,14 @@ private fun BucketlistCompactCard(
                 Text(
                     text = entry.title,
                     style = MaterialTheme.typography.titleMedium,
-                    color = CinemaAlabaster,
+                    color = colors.alabaster,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = "${entry.releaseYear}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = CinemaSilver
+                    color = colors.silver
                 )
             }
 
@@ -618,13 +616,15 @@ private fun MarkSeenAccentButton(
     compact: Boolean,
     modifier: Modifier = Modifier
 ) {
+    val colors = CinemaTheme.colors
+    val buttonInk = MaterialTheme.colorScheme.onTertiary
     val buttonBrush = Brush.horizontalGradient(
-        colors = listOf(CinemaEmerald, CinemaEmerald.copy(alpha = 0.82f))
+        colors = listOf(colors.emerald, colors.emerald.copy(alpha = 0.85f))
     )
     Surface(
         color = Color.Transparent,
         shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, CinemaAlabaster.copy(alpha = 0.20f)),
+        border = BorderStroke(1.dp, colors.alabaster.copy(alpha = 0.18f)),
         shadowElevation = 4.dp,
         modifier = modifier
             .height(48.dp)
@@ -640,14 +640,14 @@ private fun MarkSeenAccentButton(
             Icon(
                 imageVector = Icons.Rounded.CheckCircle,
                 contentDescription = null,
-                tint = CinemaObsidian,
+                tint = buttonInk,
                 modifier = Modifier.size(if (compact) 16.dp else 18.dp)
             )
             Spacer(modifier = Modifier.width(6.dp))
             Text(
                 text = "Mark Seen",
                 style = MaterialTheme.typography.labelLarge,
-                color = CinemaObsidian,
+                color = buttonInk,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1
             )
