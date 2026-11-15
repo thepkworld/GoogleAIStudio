@@ -275,6 +275,28 @@ data class PersonDetail(
     val credits: List<CatalogTitle>
 )
 
+enum class DataSourceOrigin(val label: String) {
+    TMDB_WITH_OMDB("TMDB + OMDb"),
+    OMDB_FALLBACK("OMDb Live Fallback"),
+    LOCAL_CACHE("Curated Library")
+}
+
+data class ExternalRatingsAndAwards(
+    val imdbId: String = "",
+    val imdbRating: String = "",
+    val imdbVotes: String = "",
+    val rottenTomatoes: String = "",
+    val metacritic: String = "",
+    val awards: String = "",
+    val tmdbScore: Double = 0.0
+) {
+    val hasRatings: Boolean
+        get() = imdbRating.isNotBlank() || rottenTomatoes.isNotBlank() || metacritic.isNotBlank() || tmdbScore > 0.0
+
+    val hasAwards: Boolean
+        get() = awards.isNotBlank() && !awards.equals("N/A", ignoreCase = true)
+}
+
 data class CatalogTitle(
     val id: String,
     val title: String,
@@ -313,7 +335,10 @@ data class CatalogTitle(
     val watchProviders: List<WatchProviderItem> = emptyList(),
     val keywords: List<String> = emptyList(),
     val collection: CollectionSummary? = null,
-    val seasons: List<SeasonSummary> = emptyList()
+    val seasons: List<SeasonSummary> = emptyList(),
+    val imdbId: String = "",
+    val ratingsAndAwards: ExternalRatingsAndAwards? = null,
+    val dataSource: DataSourceOrigin = DataSourceOrigin.LOCAL_CACHE
 ) {
     val isReleased: Boolean
         get() = ReleaseValidator.isReleased(

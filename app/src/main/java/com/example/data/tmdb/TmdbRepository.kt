@@ -6,6 +6,7 @@ import com.example.data.model.CatalogTitle
 import com.example.data.model.CollectionDetail
 import com.example.data.model.CollectionSummary
 import com.example.data.model.CrewMember
+import com.example.data.model.DataSourceOrigin
 import com.example.data.model.DiscoverSort
 import com.example.data.model.EpisodeItem
 import com.example.data.model.MediaType
@@ -670,7 +671,9 @@ class TmdbRepository(
                     posterUrl = buildImageUrl(c.posterPath, "w500"),
                     backdropUrl = buildImageUrl(c.backdropPath, "w780")
                 )
-            }
+            },
+            imdbId = (dto.imdbId ?: dto.externalIds?.imdbId).orEmpty(),
+            dataSource = DataSourceOrigin.TMDB_WITH_OMDB
         )
     }
 
@@ -765,7 +768,9 @@ class TmdbRepository(
                     posterUrl = buildImageUrl(s.posterPath, "w342"),
                     overview = s.overview.orEmpty()
                 )
-            }
+            },
+            imdbId = dto.externalIds?.imdbId.orEmpty(),
+            dataSource = DataSourceOrigin.TMDB_WITH_OMDB
         )
     }
 

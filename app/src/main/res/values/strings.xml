@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">CineVault</string>
+    <string name="app_name">CinemaPaglu</string>
     <string name="tagline">Curate every frame you watch.</string>
     <string name="nav_home">Home</string>
     <string name="nav_search">Search</string>

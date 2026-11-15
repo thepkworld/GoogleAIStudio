@@ -2,7 +2,13 @@ package com.example.ui.screens
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -32,18 +38,22 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Assessment
 import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.CollectionsBookmark
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.EmojiEvents
 import androidx.compose.material.icons.rounded.FormatQuote
 import androidx.compose.material.icons.rounded.LiveTv
+import androidx.compose.material.icons.rounded.LocalFireDepartment
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.RateReview
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.Star
@@ -75,18 +85,23 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.data.model.CatalogTitle
+import com.example.data.model.DataSourceOrigin
+import com.example.data.model.ExternalRatingsAndAwards
 import com.example.data.model.MediaType
 import com.example.data.model.RatingScale
 import com.example.data.model.VaultEntry
@@ -120,7 +135,9 @@ fun TitleDetailScreen(
     catalogTitle: CatalogTitle?,
     vaultEntry: VaultEntry?,
     isLoadingDetail: Boolean,
+    detailError: String? = null,
     isMutating: Boolean,
+    onRetry: () -> Unit = {},
     onBack: () -> Unit,
     onRecommendationClick: (String) -> Unit,
     onPersonClick: (Int) -> Unit,
@@ -312,6 +329,16 @@ fun TitleDetailScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 6.dp)
+                    )
+                }
+            }
+
+            if (detailError != null && !isLoadingDetail && catalogTitle == null) {
+                item(key = "detail_error_state") {
+                    DetailErrorCard(
+                        message = detailError,
+                        onRetry = onRetry,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
                     )
                 }
             }
@@ -612,11 +639,38 @@ fun TitleDetailScreen(
                         }
                     }
 
+                    // Dedicated Ratings & Awards Section (OMDb IMDb / Rotten Tomatoes / Metacritic + Awards)
+                    val ratingsAndAwards = catalogTitle?.ratingsAndAwards
+                    val fallbackAwardsText = catalogTitle?.awardsHighlight
+                        ?.takeIf { it.isNotBlank() && !it.startsWith("Status:", ignoreCase = true) && !it.startsWith("Series Status:", ignoreCase = true) }
+                        .orEmpty()
+
+                    if (isLoadingDetail && ratingsAndAwards == null) {
+                        RatingsAndAwardsSkeletonCard()
+                    } else if (ratingsAndAwards != null && (ratingsAndAwards.hasRatings || ratingsAndAwards.hasAwards || fallbackAwardsText.isNotBlank())) {
+                        RatingsAndAwardsSection(
+                            ratingsAndAwards = ratingsAndAwards,
+                            fallbackAwards = fallbackAwardsText,
+                            dataSource = catalogTitle?.dataSource ?: DataSourceOrigin.TMDB_WITH_OMDB
+                        )
+                    } else if (fallbackAwardsText.isNotBlank()) {
+                        RatingsAndAwardsSection(
+                            ratingsAndAwards = ExternalRatingsAndAwards(
+                                awards = fallbackAwardsText,
+                                tmdbScore = catalogTitle?.criticScore ?: 0.0
+                            ),
+                            fallbackAwards = fallbackAwardsText,
+                            dataSource = catalogTitle?.dataSource ?: DataSourceOrigin.LOCAL_CACHE
+                        )
+                    }
+
                     if (displaySynopsis.isNotBlank()) {
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text("Synopsis", style = MaterialTheme.typography.headlineSmall, color = CinemaAlabaster)
                             Text(displaySynopsis, style = MaterialTheme.typography.bodyLarge, color = CinemaSilver)
                         }
+                    } else if (isLoadingDetail) {
+                        SynopsisSkeletonBlock()
                     }
 
                     // Where to Watch Providers
@@ -746,22 +800,7 @@ fun TitleDetailScreen(
                         }
                     }
 
-                    if (catalogTitle?.awardsHighlight?.isNotBlank() == true) {
-                        Surface(
-                            color = CinemaGold.copy(alpha = 0.12f),
-                            shape = RoundedCornerShape(14.dp),
-                            border = BorderStroke(1.dp, CinemaGold.copy(alpha = 0.35f)),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Rounded.EmojiEvents, contentDescription = null, tint = CinemaGold, modifier = Modifier.size(22.dp))
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Text(catalogTitle.awardsHighlight, style = MaterialTheme.typography.titleSmall, color = CinemaGold)
-                            }
-                        }
-                    }
-
-                    // Production Details
+                    // Production Details (Awards already highlighted inside Ratings & Awards section)
                     Surface(
                         color = CinemaSlate,
                         shape = RoundedCornerShape(18.dp),
@@ -1092,5 +1131,390 @@ private fun DetailFactRow(
         Text(label, style = MaterialTheme.typography.bodyMedium, color = CinemaSilver)
         Spacer(modifier = Modifier.width(16.dp))
         Text(value, style = MaterialTheme.typography.bodyMedium, color = CinemaAlabaster, fontWeight = FontWeight.Medium)
+    }
+}
+
+@Composable
+private fun RatingsAndAwardsSection(
+    ratingsAndAwards: ExternalRatingsAndAwards,
+    fallbackAwards: String,
+    dataSource: DataSourceOrigin,
+    modifier: Modifier = Modifier
+) {
+    val awardsText = if (ratingsAndAwards.hasAwards) ratingsAndAwards.awards else fallbackAwards
+
+    Surface(
+        color = CinemaSlate,
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, CinemaGold.copy(alpha = 0.32f)),
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("detail_ratings_awards_section")
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Ratings & Awards",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = CinemaAlabaster
+                )
+                Surface(
+                    color = CinemaSlateElevated,
+                    shape = CircleShape,
+                    border = BorderStroke(1.dp, CinemaBorderSubtle)
+                ) {
+                    Text(
+                        text = dataSource.label,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = CinemaSilver,
+                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                RatingMetricTile(
+                    sourceLabel = "IMDb",
+                    scoreValue = ratingsAndAwards.imdbRating.ifBlank { "—" },
+                    subLabel = ratingsAndAwards.imdbVotes.takeIf { it.isNotBlank() }?.let { "$it votes" } ?: "Audience",
+                    accentColor = CinemaGold,
+                    iconContent = {
+                        Icon(
+                            imageVector = Icons.Rounded.Star,
+                            contentDescription = "IMDb Rating",
+                            tint = CinemaGold,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+
+                RatingMetricTile(
+                    sourceLabel = "Rotten Tomatoes",
+                    scoreValue = ratingsAndAwards.rottenTomatoes.ifBlank { "—" },
+                    subLabel = "Tomatometer",
+                    accentColor = CinemaCrimson,
+                    iconContent = {
+                        RottenTomatoesIcon(modifier = Modifier.size(20.dp))
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+
+                val metaNumeric = Regex("(\\d+)").find(ratingsAndAwards.metacritic)?.groupValues?.getOrNull(1)?.toIntOrNull()
+                val metaColor = when {
+                    metaNumeric == null -> CinemaSilver
+                    metaNumeric >= 61 -> CinemaEmerald
+                    metaNumeric >= 40 -> CinemaGold
+                    else -> CinemaCrimson
+                }
+                RatingMetricTile(
+                    sourceLabel = "Metacritic",
+                    scoreValue = ratingsAndAwards.metacritic.ifBlank { "—" },
+                    subLabel = "Metascore",
+                    accentColor = metaColor,
+                    iconContent = {
+                        Surface(
+                            color = metaColor.copy(alpha = 0.20f),
+                            shape = RoundedCornerShape(6.dp),
+                            border = BorderStroke(1.dp, metaColor.copy(alpha = 0.6f))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Assessment,
+                                contentDescription = "Metacritic Score",
+                                tint = metaColor,
+                                modifier = Modifier
+                                    .padding(2.dp)
+                                    .size(16.dp)
+                            )
+                        }
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            if (awardsText.isNotBlank()) {
+                Surface(
+                    color = CinemaGold.copy(alpha = 0.12f),
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.dp, CinemaGold.copy(alpha = 0.35f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("detail_awards_banner")
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(CinemaGold.copy(alpha = 0.18f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.EmojiEvents,
+                                contentDescription = "Awards",
+                                tint = CinemaGold,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Text(
+                                text = "AWARDS & HONORS",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = CinemaGold,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = awardsText,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = CinemaAlabaster,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RatingMetricTile(
+    sourceLabel: String,
+    scoreValue: String,
+    subLabel: String,
+    accentColor: Color,
+    iconContent: @Composable () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        color = CinemaSlateElevated,
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(1.dp, CinemaBorderSubtle),
+        modifier = modifier
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            iconContent()
+            Text(
+                text = scoreValue,
+                style = MaterialTheme.typography.titleMedium,
+                color = if (scoreValue == "—") CinemaSilver else CinemaAlabaster,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1
+            )
+            Text(
+                text = sourceLabel,
+                style = MaterialTheme.typography.labelSmall,
+                color = accentColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = subLabel,
+                style = MaterialTheme.typography.labelSmall,
+                color = CinemaSilver.copy(alpha = 0.78f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun RottenTomatoesIcon(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val w = size.width
+            val h = size.height
+            drawCircle(
+                color = CinemaCrimson,
+                radius = minOf(w, h) * 0.38f,
+                center = Offset(w * 0.5f, h * 0.56f)
+            )
+            drawCircle(
+                color = CinemaEmerald,
+                radius = minOf(w, h) * 0.14f,
+                center = Offset(w * 0.5f, h * 0.20f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun RatingsAndAwardsSkeletonCard(modifier: Modifier = Modifier) {
+    val pulse = rememberInfiniteTransition(label = "ratings_skeleton_pulse")
+    val alpha by pulse.animateFloat(
+        initialValue = 0.35f,
+        targetValue = 0.75f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 850),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "skeleton_alpha"
+    )
+
+    Surface(
+        color = CinemaSlate,
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, CinemaBorderSubtle),
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("detail_ratings_skeleton")
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(150.dp)
+                    .height(18.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(CinemaSlateElevated.copy(alpha = alpha))
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                repeat(3) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(84.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(CinemaSlateElevated.copy(alpha = alpha))
+                    )
+                }
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(CinemaSlateElevated.copy(alpha = alpha))
+            )
+        }
+    }
+}
+
+@Composable
+private fun SynopsisSkeletonBlock(modifier: Modifier = Modifier) {
+    val pulse = rememberInfiniteTransition(label = "synopsis_skeleton_pulse")
+    val alpha by pulse.animateFloat(
+        initialValue = 0.35f,
+        targetValue = 0.75f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 850),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "synopsis_alpha"
+    )
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .width(110.dp)
+                .height(18.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(CinemaSlateElevated.copy(alpha = alpha))
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(14.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(CinemaSlateElevated.copy(alpha = alpha))
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(0.85f)
+                .height(14.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(CinemaSlateElevated.copy(alpha = alpha))
+        )
+    }
+}
+
+@Composable
+private fun DetailErrorCard(
+    message: String,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        color = CinemaSlate,
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, CinemaCrimson.copy(alpha = 0.45f)),
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("detail_error_card")
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.CloudOff,
+                contentDescription = null,
+                tint = CinemaCrimson,
+                modifier = Modifier.size(32.dp)
+            )
+            Text(
+                text = "Unable to load title details",
+                style = MaterialTheme.typography.titleMedium,
+                color = CinemaAlabaster,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall,
+                color = CinemaSilver,
+                textAlign = TextAlign.Center
+            )
+            Button(
+                onClick = onRetry,
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = CinemaGold,
+                    contentColor = CinemaObsidian
+                ),
+                modifier = Modifier.height(48.dp)
+            ) {
+                Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Retry", fontWeight = FontWeight.Bold)
+            }
+        }
     }
 }

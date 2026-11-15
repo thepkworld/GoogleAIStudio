@@ -215,6 +215,7 @@ fun CineVaultApp() {
 
     val detailTitle by vaultViewModel.detailTitle.collectAsStateWithLifecycle()
     val isLoadingDetail by vaultViewModel.isLoadingDetail.collectAsStateWithLifecycle()
+    val detailError by vaultViewModel.detailError.collectAsStateWithLifecycle()
     val personDetail by vaultViewModel.personDetail.collectAsStateWithLifecycle()
     val isLoadingPerson by vaultViewModel.isLoadingPerson.collectAsStateWithLifecycle()
     val collectionDetail by vaultViewModel.collectionDetail.collectAsStateWithLifecycle()
@@ -352,7 +353,7 @@ fun CineVaultApp() {
                                     }
 
                                     StatusLivePill(
-                                        isLive = browseUiState.isLiveTmdb,
+                                        isLive = browseUiState.isLiveTmdb || browseUiState.isLiveOmdb,
                                         onClick = { vaultViewModel.refreshTmdbFeeds() },
                                         modifier = Modifier.padding(end = 12.dp)
                                     )
@@ -636,7 +637,9 @@ fun CineVaultApp() {
                 catalogTitle = catalogTitle,
                 vaultEntry = vaultEntry,
                 isLoadingDetail = isLoadingDetail,
+                detailError = detailError,
                 isMutating = isMutating,
+                onRetry = { vaultViewModel.loadTitleDetails(titleId) },
                 onBack = { navController.popBackStack() },
                 onRecommendationClick = { recId -> navController.navigate("detail/$recId") },
                 onPersonClick = { pid -> navController.navigate("person/$pid") },

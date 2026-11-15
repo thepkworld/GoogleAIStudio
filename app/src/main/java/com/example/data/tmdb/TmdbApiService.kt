@@ -147,7 +147,7 @@ interface TmdbApiService {
     suspend fun getMovieDetails(
         @Path("movie_id") movieId: Int,
         @Query("append_to_response") appendToResponse: String =
-            "credits,reviews,images,videos,recommendations,similar,release_dates,watch/providers,keywords",
+            "credits,reviews,images,videos,recommendations,similar,release_dates,watch/providers,keywords,external_ids",
         @Query("language") language: String = "en-US"
     ): TmdbMovieDetailDto
 
@@ -155,7 +155,7 @@ interface TmdbApiService {
     suspend fun getTvDetails(
         @Path("tv_id") tvId: Int,
         @Query("append_to_response") appendToResponse: String =
-            "credits,reviews,images,videos,recommendations,similar,content_ratings,watch/providers,keywords",
+            "credits,reviews,images,videos,recommendations,similar,content_ratings,watch/providers,keywords,external_ids",
         @Query("language") language: String = "en-US"
     ): TmdbTvDetailDto
 

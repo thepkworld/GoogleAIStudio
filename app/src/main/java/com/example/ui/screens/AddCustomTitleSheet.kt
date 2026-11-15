@@ -103,7 +103,7 @@ fun AddCustomTitleSheet(
                 color = CinemaAlabaster
             )
             Text(
-                text = "Log any film or show directly into your personal CineVault.",
+                text = "Log any film or show directly into your personal CinemaPaglu.",
                 style = MaterialTheme.typography.bodySmall,
                 color = CinemaSilver
             )

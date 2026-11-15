@@ -20,6 +20,8 @@ import com.example.data.model.TmdbGenre
 import com.example.data.model.TmdbSection
 import com.example.data.model.VaultEntry
 import com.example.data.model.WatchStatus
+import com.example.data.omdb.OmdbRepository
+import com.example.data.repository.UnifiedMediaService
 import com.example.data.repository.VaultRepository
 import com.example.data.tmdb.TmdbRepository
 import java.text.SimpleDateFormat
@@ -161,6 +163,7 @@ data class HomeUiState(
     val isLoading: Boolean = false,
     val isLoadingOtt: Boolean = false,
     val isLiveTmdb: Boolean = false,
+    val isLiveOmdb: Boolean = false,
     val selectedOttPlatform: OttPlatform = OttPlatform.ALL,
     val featuredTitle: CatalogTitle = CatalogRepository.featuredTitle(),
     val trendingNow: List<CatalogTitle> = CatalogRepository.trendingFallback(),
@@ -179,6 +182,7 @@ data class HomeUiState(
 data class BrowseUiState(
     val keyConfigured: Boolean = false,
     val isLiveTmdb: Boolean = false,
+    val isLiveOmdb: Boolean = false,
     val isLoading: Boolean = false,
     val isLoadingMore: Boolean = false,
     val errorMessage: String? = null,
@@ -203,13 +207,19 @@ data class BrowseUiState(
     val totalPages: Int = 1
 ) {
     val canLoadMore: Boolean
-        get() = isLiveTmdb && currentPage < totalPages && !isLoading && !isLoadingMore
+        get() = (isLiveTmdb || isLiveOmdb) && currentPage < totalPages && !isLoading && !isLoadingMore
 }
 
 class VaultViewModel(
     private val repository: VaultRepository,
-    private val tmdbRepository: TmdbRepository = TmdbRepository()
+    private val tmdbRepository: TmdbRepository = TmdbRepository(),
+    private val omdbRepository: OmdbRepository = OmdbRepository()
 ) : ViewModel() {
+
+    private val unifiedMediaService = UnifiedMediaService(
+        tmdbRepository = tmdbRepository,
+        omdbRepository = omdbRepository
+    )
 
     private val localCatalogTitles: List<CatalogTitle> = CatalogRepository.allTitles()
     val localGenres: List<String> = CatalogRepository.allGenres
@@ -222,7 +232,7 @@ class VaultViewModel(
     val browseMediaFilter: StateFlow<MediaFilter> = _browseMediaFilter.asStateFlow()
 
     private val _browseUiState = MutableStateFlow(
-        BrowseUiState(keyConfigured = tmdbRepository.hasConfiguredApiKey())
+        BrowseUiState(keyConfigured = tmdbRepository.hasConfiguredApiKey() || omdbRepository.hasConfiguredApiKey())
     )
     val browseUiState: StateFlow<BrowseUiState> = _browseUiState.asStateFlow()
 
@@ -232,6 +242,9 @@ class VaultViewModel(
 
     private val _isLoadingDetail = MutableStateFlow(false)
     val isLoadingDetail: StateFlow<Boolean> = _isLoadingDetail.asStateFlow()
+
+    private val _detailError = MutableStateFlow<String?>(null)
+    val detailError: StateFlow<String?> = _detailError.asStateFlow()
 
     private val _personDetail = MutableStateFlow<PersonDetail?>(null)
     val personDetail: StateFlow<PersonDetail?> = _personDetail.asStateFlow()
@@ -304,6 +317,8 @@ class VaultViewModel(
     init {
         if (tmdbRepository.hasConfiguredApiKey()) {
             loadInitialTmdbFeeds()
+        } else if (omdbRepository.hasConfiguredApiKey()) {
+            loadOmdbFallbackFeeds(noticeIfFailed = null)
         } else {
             refreshOfflineFilteredBrowse()
         }
@@ -589,8 +604,12 @@ class VaultViewModel(
 
     fun refreshTmdbFeeds() {
         if (!tmdbRepository.hasConfiguredApiKey()) {
-            _snackbarEvents.tryEmit("Add your TMDB_API_KEY in AI Studio Secrets for live TMDB feeds.")
-            refreshOfflineFilteredBrowse()
+            if (omdbRepository.hasConfiguredApiKey()) {
+                loadOmdbFallbackFeeds(noticeIfFailed = null)
+            } else {
+                _snackbarEvents.tryEmit("Add TMDB_API_KEY in AI Studio Secrets for live TMDB discovery.")
+                refreshOfflineFilteredBrowse()
+            }
             return
         }
         loadInitialTmdbFeeds()
@@ -663,6 +682,7 @@ class VaultViewModel(
                     state.copy(
                         isLoading = false,
                         isLiveTmdb = true,
+                        isLiveOmdb = omdbRepository.hasConfiguredApiKey(),
                         featuredTitle = hero,
                         trendingNow = trendingAll.ifEmpty { state.trendingNow },
                         bollywoodMovies = bollywood.ifEmpty { state.bollywoodMovies },
@@ -678,17 +698,68 @@ class VaultViewModel(
                     )
                 }
             }.onFailure { err ->
-                Log.w(TAG, "TMDB initial load failed, using curated fallback", err)
-                _browseUiState.update { state ->
-                    state.copy(
-                        isLoading = false,
-                        isLiveTmdb = false,
-                        errorMessage = "TMDB live sync unavailable (${err.localizedMessage ?: "check TMDB_API_KEY"}). Showing curated library."
-                    )
-                }
-                _homeUiState.update { it.copy(isLoading = false, isLiveTmdb = false) }
-                refreshOfflineFilteredBrowse()
+                Log.w(TAG, "TMDB initial load failed, falling back to OMDb API", err)
+                loadOmdbFallbackFeeds(
+                    noticeIfFailed = "TMDB live sync unavailable (${err.localizedMessage ?: "check TMDB_API_KEY"}). Showing curated library."
+                )
             }
+        }
+    }
+
+    private fun loadOmdbFallbackFeeds(noticeIfFailed: String?) {
+        sectionJob?.cancel()
+        sectionJob = viewModelScope.launch {
+            _browseUiState.update { it.copy(isLoading = true, errorMessage = null) }
+            _homeUiState.update { it.copy(isLoading = true) }
+
+            unifiedMediaService.fetchOmdbFallbackHomeFeeds()
+                .onSuccess { feeds ->
+                    val browsePool = (feeds.trendingNow + feeds.bollywoodMovies + feeds.classicMovies)
+                        .distinctBy { it.id }
+                    val filteredBrowse = filterAndSortTitlesLocally(
+                        titles = browsePool.ifEmpty { localCatalogTitles },
+                        mediaFilter = _browseMediaFilter.value,
+                        selectedGenres = _browseUiState.value.selectedGenres,
+                        sort = _browseUiState.value.discoverSort
+                    )
+                    _browseUiState.update { state ->
+                        state.copy(
+                            isLoading = false,
+                            isLiveTmdb = false,
+                            isLiveOmdb = true,
+                            errorMessage = null,
+                            featuredTitle = feeds.featuredTitle ?: state.featuredTitle,
+                            sectionTitles = filteredBrowse,
+                            currentPage = 1,
+                            totalPages = 1
+                        )
+                    }
+                    _homeUiState.update { state ->
+                        state.copy(
+                            isLoading = false,
+                            isLiveTmdb = false,
+                            isLiveOmdb = true,
+                            featuredTitle = feeds.featuredTitle ?: state.featuredTitle,
+                            trendingNow = feeds.trendingNow.ifEmpty { state.trendingNow },
+                            bollywoodMovies = feeds.bollywoodMovies.ifEmpty { state.bollywoodMovies },
+                            hollywoodMovies = feeds.hollywoodMovies.ifEmpty { state.hollywoodMovies },
+                            topRatedMovies = feeds.topRatedMovies.ifEmpty { state.topRatedMovies },
+                            classicMovies = feeds.classicMovies.ifEmpty { state.classicMovies }
+                        )
+                    }
+                }
+                .onFailure {
+                    _browseUiState.update { state ->
+                        state.copy(
+                            isLoading = false,
+                            isLiveTmdb = false,
+                            isLiveOmdb = false,
+                            errorMessage = noticeIfFailed
+                        )
+                    }
+                    _homeUiState.update { it.copy(isLoading = false, isLiveTmdb = false, isLiveOmdb = false) }
+                    refreshOfflineFilteredBrowse()
+                }
         }
     }
 
@@ -922,14 +993,14 @@ class VaultViewModel(
 
     fun selectSearchScope(scope: SearchScope) {
         _browseUiState.update { it.copy(searchScope = scope) }
-        if (_browseQuery.value.isNotBlank() && tmdbRepository.hasConfiguredApiKey()) {
+        if (_browseQuery.value.isNotBlank() && (tmdbRepository.hasConfiguredApiKey() || omdbRepository.hasConfiguredApiKey())) {
             triggerSearch(_browseQuery.value)
         }
     }
 
     fun updateBrowseQuery(query: String) {
         _browseQuery.value = query
-        if (!tmdbRepository.hasConfiguredApiKey()) {
+        if (!tmdbRepository.hasConfiguredApiKey() && !omdbRepository.hasConfiguredApiKey()) {
             refreshOfflineFilteredBrowse()
             return
         }
@@ -942,10 +1013,16 @@ class VaultViewModel(
         if (trimmed.isEmpty()) {
             _browseUiState.update { it.copy(searchPeople = emptyList(), searchCollections = emptyList()) }
             val state = _browseUiState.value
-            if (state.selectedGenres.isNotEmpty() || state.discoverSort != DiscoverSort.POPULARITY) {
-                runDiscover()
+            if (tmdbRepository.hasConfiguredApiKey() && state.isLiveTmdb) {
+                if (state.selectedGenres.isNotEmpty() || state.discoverSort != DiscoverSort.POPULARITY) {
+                    runDiscover()
+                } else {
+                    selectTmdbSection(state.selectedSection)
+                }
+            } else if (omdbRepository.hasConfiguredApiKey() && state.isLiveOmdb) {
+                loadOmdbFallbackFeeds(noticeIfFailed = null)
             } else {
-                selectTmdbSection(state.selectedSection)
+                refreshOfflineFilteredBrowse()
             }
             return
         }
@@ -954,7 +1031,7 @@ class VaultViewModel(
             delay(350)
             _browseUiState.update { it.copy(isLoading = true, errorMessage = null) }
             val activeScope = _browseUiState.value.searchScope
-            tmdbRepository.search(trimmed, activeScope, page = 1).onSuccess { bundle ->
+            unifiedMediaService.searchWithFallback(trimmed, activeScope, page = 1).onSuccess { (bundle, origin) ->
                 val state = _browseUiState.value
                 val processedTitles = filterAndSortTitlesLocally(
                     titles = bundle.titles,
@@ -962,10 +1039,13 @@ class VaultViewModel(
                     selectedGenres = state.selectedGenres,
                     sort = state.discoverSort
                 )
+                val usingTmdb = origin == com.example.data.model.DataSourceOrigin.TMDB_WITH_OMDB
                 _browseUiState.update { current ->
                     current.copy(
                         isLoading = false,
-                        isLiveTmdb = true,
+                        isLiveTmdb = usingTmdb,
+                        isLiveOmdb = !usingTmdb || omdbRepository.hasConfiguredApiKey(),
+                        errorMessage = null,
                         sectionTitles = processedTitles,
                         searchPeople = bundle.people,
                         searchCollections = bundle.collections,
@@ -1025,7 +1105,7 @@ class VaultViewModel(
             _browseUiState.update { it.copy(isLoadingMore = true) }
             val query = _browseQuery.value.trim()
             if (query.isNotEmpty()) {
-                tmdbRepository.search(query, state.searchScope, page = nextPage).onSuccess { bundle ->
+                unifiedMediaService.searchWithFallback(query, state.searchScope, page = nextPage).onSuccess { (bundle, _) ->
                     val filteredBatch = filterAndSortTitlesLocally(
                         titles = bundle.titles,
                         mediaFilter = _browseMediaFilter.value,
@@ -1141,29 +1221,33 @@ class VaultViewModel(
     }
 
     fun resolveCatalogTitle(titleId: String): CatalogTitle? {
-        return CatalogRepository.findById(titleId)
-            ?: tmdbRepository.findCachedById(titleId)
+        return unifiedMediaService.findCachedById(titleId)
     }
 
     fun loadTitleDetails(titleId: String) {
         val immediate = resolveCatalogTitle(titleId)
         _detailTitle.value = immediate
+        _detailError.value = null
 
-        if (!tmdbRepository.hasConfiguredApiKey() || TmdbRepository.parseTmdbId(titleId) == null) {
-            _isLoadingDetail.value = false
-            return
-        }
+        val matchingEntry = (vaultEntriesState.value as? UiState.Success)?.data
+            ?.firstOrNull { it.id == titleId || it.catalogId == titleId }
 
         detailJob?.cancel()
         detailJob = viewModelScope.launch {
             _isLoadingDetail.value = true
-            tmdbRepository.fetchFullDetails(titleId)
-                .onSuccess { detailed ->
-                    _detailTitle.value = detailed
+            unifiedMediaService.fetchUnifiedTitleDetails(
+                titleId = titleId,
+                hintTitle = immediate,
+                hintEntry = matchingEntry
+            ).onSuccess { unified ->
+                _detailTitle.value = unified
+                _detailError.value = null
+            }.onFailure { err ->
+                Log.w(TAG, "Failed to fetch unified TMDB/OMDb details for $titleId", err)
+                if (_detailTitle.value == null && matchingEntry == null) {
+                    _detailError.value = err.localizedMessage ?: "Unable to load details from TMDB or OMDb."
                 }
-                .onFailure { err ->
-                    Log.w(TAG, "Failed to fetch full TMDB details for $titleId", err)
-                }
+            }
             _isLoadingDetail.value = false
         }
     }

@@ -19,12 +19,16 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Configure TMDB API secret (if provided)
+      - name: Configure API secrets (if provided)
         env:
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+          OMDB_API_KEY: ${{ secrets.OMDB_API_KEY }}
         run: |
           if [ -n "$TMDB_API_KEY" ]; then
-            printf 'TMDB_API_KEY=%s\n' "$TMDB_API_KEY" > .env
+            printf 'TMDB_API_KEY=%s\n' "$TMDB_API_KEY" >> .env
+          fi
+          if [ -n "$OMDB_API_KEY" ]; then
+            printf 'OMDB_API_KEY=%s\n' "$OMDB_API_KEY" >> .env
           fi
 
       - name: Configure debug keystore
@@ -55,9 +59,9 @@ jobs:
       - name: Build Debug APK
         run: gradle :app:assembleDebug --no-daemon
 
-      - name: Upload CineVault APK
+      - name: Upload CinemaPaglu APK
         uses: actions/upload-artifact@v4
         with:
-          name: CineVault-debug-apk
+          name: CinemaPaglu-debug-apk
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error

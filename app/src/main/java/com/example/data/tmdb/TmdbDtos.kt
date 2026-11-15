@@ -160,6 +160,8 @@ data class TmdbMovieDetailDto(
     @param:Json(name = "popularity") val popularity: Double = 0.0,
     @param:Json(name = "original_language") val originalLanguage: String? = null,
     @param:Json(name = "belongs_to_collection") val belongsToCollection: TmdbCollectionRefDto? = null,
+    @param:Json(name = "imdb_id") val imdbId: String? = null,
+    @param:Json(name = "external_ids") val externalIds: TmdbExternalIdsDto? = null,
     @param:Json(name = "genres") val genres: List<TmdbGenreDto> = emptyList(),
     @param:Json(name = "production_companies") val productionCompanies: List<TmdbProductionCompanyDto> = emptyList(),
     @param:Json(name = "production_countries") val productionCountries: List<TmdbCountryDto> = emptyList(),
@@ -204,9 +206,14 @@ data class TmdbTvDetailDto(
     @param:Json(name = "images") val images: TmdbImagesResponse? = null,
     @param:Json(name = "recommendations") val recommendations: TmdbPagedResponse<TmdbMediaDto>? = null,
     @param:Json(name = "similar") val similar: TmdbPagedResponse<TmdbMediaDto>? = null,
+    @param:Json(name = "external_ids") val externalIds: TmdbExternalIdsDto? = null,
     @param:Json(name = "content_ratings") val contentRatings: TmdbContentRatingsResponse? = null,
     @param:Json(name = "watch/providers") val watchProviders: TmdbWatchProvidersResponse? = null,
     @param:Json(name = "keywords") val keywords: TmdbKeywordsResponse? = null
+)
+
+data class TmdbExternalIdsDto(
+    @param:Json(name = "imdb_id") val imdbId: String? = null
 )
 
 data class TmdbProductionCompanyDto(
