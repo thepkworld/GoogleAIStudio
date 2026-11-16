@@ -168,15 +168,18 @@ object VaultPortabilityManager {
             }
         }
 
-        val rawStatus = obj.optString("status", WatchStatus.WANT_TO_WATCH.value)
-        val normalizedStatus = if (rawStatus == WatchStatus.WATCHED.value) {
+        val rawStatus = obj.optString("status", WatchStatus.WANT_TO_WATCH.value).trim()
+        val normalizedStatus = if (rawStatus.equals(WatchStatus.WATCHED.value, ignoreCase = true)) {
             WatchStatus.WATCHED.value
         } else {
             WatchStatus.WANT_TO_WATCH.value
         }
 
-        val rawMediaType = obj.optString("mediaType", MediaType.MOVIE.value)
-        val normalizedMediaType = if (rawMediaType == MediaType.SERIES.value) {
+        val rawMediaType = obj.optString("mediaType", MediaType.MOVIE.value).trim()
+        val normalizedMediaType = if (
+            rawMediaType.equals(MediaType.SERIES.value, ignoreCase = true) ||
+            rawMediaType.equals("tv", ignoreCase = true)
+        ) {
             MediaType.SERIES.value
         } else {
             MediaType.MOVIE.value

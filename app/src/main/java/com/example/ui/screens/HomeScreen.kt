@@ -92,7 +92,6 @@ import com.example.ui.theme.CinemaCrimson
 import com.example.ui.theme.CinemaEmerald
 import com.example.ui.theme.CinemaGold
 import com.example.ui.theme.CinemaIndigo
-import com.example.ui.theme.CinemaObsidian
 import com.example.ui.theme.CinemaTheme
 
 private data class GenreCollectionCard(
@@ -104,14 +103,14 @@ private data class GenreCollectionCard(
 )
 
 private val genreCollections = listOf(
-    GenreCollectionCard("Sci-Fi", "Futures & galaxies", "Science Fiction", CinemaIndigo, CinemaObsidian),
-    GenreCollectionCard("Action", "High-octane thrills", "Action", CinemaCrimson, CinemaObsidian),
-    GenreCollectionCard("Crime & Noir", "Heists & mysteries", "Crime", CinemaGold, CinemaObsidian),
-    GenreCollectionCard("Drama", "Prestige stories", "Drama", CinemaEmerald, CinemaObsidian),
-    GenreCollectionCard("Comedy", "Feel-good & sharp", "Comedy", Color(0xFF4CC9F0), CinemaObsidian),
-    GenreCollectionCard("Thriller", "Edge-of-seat tension", "Thriller", Color(0xFFF77F00), CinemaObsidian),
-    GenreCollectionCard("Animation", "Worlds imagined", "Animation", Color(0xFFB5179E), CinemaObsidian),
-    GenreCollectionCard("Romance", "Heart & chemistry", "Romance", Color(0xFFE05780), CinemaObsidian)
+    GenreCollectionCard("Sci-Fi", "Futures & galaxies", "Science Fiction", CinemaIndigo, Color(0xFF0A0B0F)),
+    GenreCollectionCard("Action", "High-octane thrills", "Action", CinemaCrimson, Color(0xFF0A0B0F)),
+    GenreCollectionCard("Crime & Noir", "Heists & mysteries", "Crime", CinemaGold, Color(0xFF0A0B0F)),
+    GenreCollectionCard("Drama", "Prestige stories", "Drama", CinemaEmerald, Color(0xFF0A0B0F)),
+    GenreCollectionCard("Comedy", "Feel-good & sharp", "Comedy", Color(0xFF4CC9F0), Color(0xFF0A0B0F)),
+    GenreCollectionCard("Thriller", "Edge-of-seat tension", "Thriller", Color(0xFFF77F00), Color(0xFF0A0B0F)),
+    GenreCollectionCard("Animation", "Worlds imagined", "Animation", Color(0xFFB5179E), Color(0xFF0A0B0F)),
+    GenreCollectionCard("Romance", "Heart & chemistry", "Romance", Color(0xFFE05780), Color(0xFF0A0B0F))
 )
 
 @Composable

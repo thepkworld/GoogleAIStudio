@@ -5,7 +5,16 @@ plugins {
   alias(libs.plugins.kotlin.compose)
   alias(libs.plugins.google.devtools.ksp)
   alias(libs.plugins.secrets)
-  alias(libs.plugins.google.services)
+}
+
+val hasGoogleServicesJson = listOf(
+  file("google-services.json"),
+  file("src/debug/google-services.json"),
+  file("src/release/google-services.json")
+).any { it.exists() }
+
+if (hasGoogleServicesJson) {
+  apply(plugin = libs.plugins.google.services.get().pluginId)
 }
 
 android {

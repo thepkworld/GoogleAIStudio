@@ -135,6 +135,7 @@ import com.example.ui.screens.TitleDetailScreen
 import com.example.ui.screens.WatchedScreen
 import com.example.ui.screens.WatchlistScreen
 import com.example.ui.theme.CinemaTheme
+import com.google.firebase.FirebaseApp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -178,13 +179,23 @@ fun defaultCineVaultViewModelFactory(): ViewModelProvider.Factory = viewModelFac
         val app = checkNotNull(this[APPLICATION_KEY]) {
             "APPLICATION_KEY missing from CreationExtras"
         }
+        val firebaseAvailable = FirebaseApp.getApps(app).isNotEmpty() ||
+            runCatching { FirebaseApp.initializeApp(app) != null }.getOrDefault(false)
         VaultViewModel(
             repository = VaultRepository(app),
             tmdbRepository = TmdbRepository(),
             omdbRepository = OmdbRepository(),
-            cloudRepository = VaultCloudRepository(app),
+            cloudRepository = if (firebaseAvailable) {
+                runCatching { VaultCloudRepository(app) }.getOrNull()
+            } else {
+                null
+            },
             preferencesRepository = AppPreferencesRepository(app),
-            authSessionManager = AuthSessionManager()
+            authSessionManager = if (firebaseAvailable) {
+                runCatching { AuthSessionManager() }.getOrNull()
+            } else {
+                null
+            }
         )
     }
 }

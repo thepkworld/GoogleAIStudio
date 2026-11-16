@@ -1813,7 +1813,13 @@ class VaultViewModel(
     }
 
     fun signInWithGoogle(activityContext: Context, isSignUp: Boolean = false) {
-        val manager = authSessionManager ?: return
+        val manager = authSessionManager
+        if (manager == null) {
+            val msg = "Cloud sign-in is unavailable in this build because Firebase google-services.json is not configured. Continue as Guest or add GOOGLE_SERVICES_JSON to GitHub Secrets."
+            _authErrorMessage.value = msg
+            _snackbarEvents.tryEmit(msg)
+            return
+        }
         viewModelScope.launch {
             _isAuthBusy.value = true
             _authErrorMessage.value = null
