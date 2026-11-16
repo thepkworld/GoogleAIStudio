@@ -233,9 +233,64 @@ class OmdbAndFallbackTest {
         assertEquals("Won 1 Oscar. 44 wins & 148 nominations total", fallbackDetail.ratingsAndAwards?.awards)
     }
 
+    @Test
+    fun unifiedMediaService_searchWithFallback_recoversWithOmdbForAllScopesWhenTmdbFails() = runTest {
+        val failingTmdb = proxyTmdbService(
+            onSearchMulti = { throw IOException("TMDB down") },
+            onSearchPeople = { throw IOException("TMDB people down") },
+            onSearchCollections = { throw IOException("TMDB collections down") }
+        )
+        val capturedTypes = mutableListOf<String?>()
+        val omdbService = object : OmdbApiService {
+            override suspend fun getByImdbId(imdbId: String, plot: String, format: String) =
+                OmdbTitleDetailDto(response = "False", error = "Not found")
+
+            override suspend fun getByTitle(title: String, year: Int?, type: String?, plot: String, format: String) =
+                OmdbTitleDetailDto(response = "False", error = "Not found")
+
+            override suspend fun search(query: String, type: String?, page: Int, format: String): OmdbSearchResponseDto {
+                capturedTypes.add(type)
+                return OmdbSearchResponseDto(
+                    search = listOf(
+                        OmdbSearchItemDto(
+                            title = "Dune",
+                            year = "2021",
+                            imdbId = "tt1160419",
+                            type = type ?: "movie",
+                            poster = "https://m.media-amazon.com/images/dune.jpg"
+                        )
+                    ),
+                    totalResults = "1",
+                    response = "True"
+                )
+            }
+        }
+
+        val unified = UnifiedMediaService(
+            tmdbRepository = TmdbRepository(apiKeyProvider = { "test_tmdb_key" }, serviceOverride = failingTmdb),
+            omdbRepository = OmdbRepository(apiKeyProvider = { "f3aaa85e" }, serviceOverride = omdbService)
+        )
+
+        val peopleFallback = unified.searchWithFallback("Dune", SearchScope.PEOPLE)
+        assertTrue(peopleFallback.isSuccess)
+        val (peopleBundle, peopleOrigin) = peopleFallback.getOrThrow()
+        assertEquals(DataSourceOrigin.OMDB_FALLBACK, peopleOrigin)
+        assertEquals("omdb_tt1160419", peopleBundle.titles.first().id)
+
+        val colFallback = unified.searchWithFallback("Dune", SearchScope.COLLECTIONS)
+        assertTrue(colFallback.isSuccess)
+        val (colBundle, colOrigin) = colFallback.getOrThrow()
+        assertEquals(DataSourceOrigin.OMDB_FALLBACK, colOrigin)
+        assertEquals("omdb_tt1160419", colBundle.titles.first().id)
+
+        assertEquals(listOf<String?>(null, null), capturedTypes)
+    }
+
     private fun proxyTmdbService(
         onGetMovieDetails: suspend (Int) -> TmdbMovieDetailDto = { error("Not mocked") },
-        onSearchMulti: suspend () -> Nothing = { error("Not mocked") }
+        onSearchMulti: suspend () -> Nothing = { error("Not mocked") },
+        onSearchPeople: suspend () -> Nothing = { error("Not mocked") },
+        onSearchCollections: suspend () -> Nothing = { error("Not mocked") }
     ): TmdbApiService {
         return Proxy.newProxyInstance(
             TmdbApiService::class.java.classLoader,
@@ -250,6 +305,14 @@ class OmdbAndFallbackTest {
                 "searchMulti" -> {
                     val cont = args.last() as kotlin.coroutines.Continuation<Any?>
                     runSuspend(cont) { onSearchMulti() }
+                }
+                "searchPeople" -> {
+                    val cont = args.last() as kotlin.coroutines.Continuation<Any?>
+                    runSuspend(cont) { onSearchPeople() }
+                }
+                "searchCollections" -> {
+                    val cont = args.last() as kotlin.coroutines.Continuation<Any?>
+                    runSuspend(cont) { onSearchCollections() }
                 }
                 else -> throw UnsupportedOperationException("Unexpected call: ${method.name}")
             }
