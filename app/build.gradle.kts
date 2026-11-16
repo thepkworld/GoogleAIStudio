@@ -7,7 +7,8 @@ plugins {
   alias(libs.plugins.secrets)
 }
 
-val hasGoogleServicesJson = listOf(
+val skipGoogleServices = findProperty("skipGoogleServices")?.toString()?.toBoolean() == true
+val hasGoogleServicesJson = !skipGoogleServices && listOf(
   file("google-services.json"),
   file("src/debug/google-services.json"),
   file("src/release/google-services.json")

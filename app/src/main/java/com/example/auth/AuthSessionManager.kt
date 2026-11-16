@@ -9,7 +9,6 @@ import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.NoCredentialException
-import com.example.R
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
@@ -50,9 +49,7 @@ class AuthSessionManager(
 
     suspend fun attemptSilentSignIn(context: Context): AuthUserSummary? {
         auth.currentUser?.let { return it.toSummary() }
-        val clientId = runCatching {
-            context.applicationContext.getString(R.string.default_web_client_id)
-        }.getOrNull()?.takeIf { it.isNotBlank() } ?: return null
+        val clientId = resolveWebClientId(context) ?: return null
 
         val googleIdOption = GetGoogleIdOption.Builder()
             .setFilterByAuthorizedAccounts(true)
@@ -84,14 +81,10 @@ class AuthSessionManager(
     }
 
     suspend fun signInWithGoogle(activityContext: Context): Result<AuthUserSummary> {
-        val clientId = try {
-            activityContext.applicationContext.getString(R.string.default_web_client_id)
-        } catch (e: Exception) {
-            return Result.failure(IllegalStateException("Google Sign-In configuration missing (default_web_client_id)."))
-        }
-        if (clientId.isBlank()) {
-            return Result.failure(IllegalStateException("Google Sign-In Web Client ID is empty."))
-        }
+        val clientId = resolveWebClientId(activityContext)
+            ?: return Result.failure(
+                IllegalStateException("Google Sign-In configuration missing (default_web_client_id).")
+            )
 
         val activity = activityContext as? Activity
             ?: return Result.failure(IllegalStateException("An active screen context is required for Google Sign-In."))
@@ -152,6 +145,20 @@ class AuthSessionManager(
             email = email.orEmpty(),
             photoUrl = photoUrl?.toString().orEmpty()
         )
+    }
+
+    @Suppress("DiscouragedApi")
+    private fun resolveWebClientId(context: Context): String? {
+        val appContext = context.applicationContext
+        val resId = appContext.resources.getIdentifier(
+            "default_web_client_id",
+            "string",
+            appContext.packageName
+        )
+        if (resId == 0) return null
+        return runCatching { appContext.getString(resId) }
+            .getOrNull()
+            ?.takeIf { it.isNotBlank() }
     }
 
     private companion object {
