@@ -30,6 +30,7 @@ import com.example.data.portability.VaultPortabilityManager
 import com.example.data.preferences.AppPreferencesRepository
 import com.example.data.preferences.AppPreferencesState
 import com.example.data.remote.VaultCloudRepository
+import com.example.data.repository.LocalAccountRepository
 import com.example.data.repository.UnifiedMediaService
 import com.example.data.repository.VaultRepository
 import com.example.data.tmdb.TmdbRepository
@@ -231,7 +232,8 @@ class VaultViewModel(
     private val omdbRepository: OmdbRepository = OmdbRepository(),
     private val cloudRepository: VaultCloudRepository? = null,
     private val preferencesRepository: AppPreferencesRepository? = null,
-    private val authSessionManager: AuthSessionManager? = null
+    private val authSessionManager: AuthSessionManager? = null,
+    private val localAccountRepository: LocalAccountRepository? = null
 ) : ViewModel() {
 
     private val unifiedMediaService = UnifiedMediaService(
@@ -385,18 +387,35 @@ class VaultViewModel(
                 preferencesRepository.preferencesFlow.collect { state ->
                     _preferencesState.value = state
                     _preferencesLoaded.value = true
+                    val currentFirebaseUser = authSessionManager?.currentUserSummary()
+                    if (currentFirebaseUser == null) {
+                        val localId = state.activeLocalAccountId
+                        if (!localId.isNullOrBlank() && localAccountRepository != null) {
+                            val localUser = localAccountRepository.getAccountSummary(localId)
+                            if (localUser != null) {
+                                _authUser.value = localUser
+                            }
+                        } else if (_authUser.value?.isCloudSynced == false) {
+                            _authUser.value = null
+                        }
+                    }
                 }
             }
         }
         if (authSessionManager != null) {
             viewModelScope.launch {
                 authSessionManager.observeAuthUser().collect { user ->
-                    _authUser.value = user
                     cloudSyncJob?.cancel()
                     if (user != null) {
+                        _authUser.value = user
+                        preferencesRepository?.setActiveLocalAccountId(null)
                         preferencesRepository?.setOnboardingCompleted(completed = true, isGuest = false)
                         startCloudSyncForUser(user.uid)
                     } else {
+                        val activeLocalId = _preferencesState.value.activeLocalAccountId
+                        if (activeLocalId.isNullOrBlank()) {
+                            _authUser.value = null
+                        }
                         _pendingGuestMergeCount.value = 0
                     }
                 }
@@ -1808,14 +1827,83 @@ class VaultViewModel(
 
     // ---- Onboarding, Auth, Theme & Cloud Sync ----
 
+    private fun cloudUserId(): String? = _authUser.value?.takeIf { it.isCloudSynced }?.uid
+
     fun clearAuthError() {
         _authErrorMessage.value = null
     }
 
-    fun signInWithGoogle(activityContext: Context, isSignUp: Boolean = false) {
+    fun signUpWithEmail(
+        fullName: String,
+        email: String,
+        password: String,
+        confirmPassword: String,
+        onSuccess: () -> Unit = {}
+    ) {
+        val localRepo = localAccountRepository
+        if (localRepo == null) {
+            val msg = "Account registration service is unavailable."
+            _authErrorMessage.value = msg
+            return
+        }
+        viewModelScope.launch {
+            _isAuthBusy.value = true
+            _authErrorMessage.value = null
+            val res = localRepo.signUp(
+                fullName = fullName,
+                email = email,
+                password = password,
+                confirmPassword = confirmPassword
+            )
+            _isAuthBusy.value = false
+            res.onSuccess { user ->
+                _authUser.value = user
+                preferencesRepository?.setActiveLocalAccountId(user.uid)
+                _snackbarEvents.tryEmit("Account created! Welcome, ${user.displayName}")
+                onSuccess()
+            }.onFailure { err ->
+                val msg = err.localizedMessage ?: "Could not create account."
+                _authErrorMessage.value = msg
+            }
+        }
+    }
+
+    fun signInWithEmail(
+        email: String,
+        password: String,
+        onSuccess: () -> Unit = {}
+    ) {
+        val localRepo = localAccountRepository
+        if (localRepo == null) {
+            val msg = "Account sign-in service is unavailable."
+            _authErrorMessage.value = msg
+            return
+        }
+        viewModelScope.launch {
+            _isAuthBusy.value = true
+            _authErrorMessage.value = null
+            val res = localRepo.signIn(email = email, password = password)
+            _isAuthBusy.value = false
+            res.onSuccess { user ->
+                _authUser.value = user
+                preferencesRepository?.setActiveLocalAccountId(user.uid)
+                _snackbarEvents.tryEmit("Welcome back, ${user.displayName}")
+                onSuccess()
+            }.onFailure { err ->
+                val msg = err.localizedMessage ?: "Sign-in failed."
+                _authErrorMessage.value = msg
+            }
+        }
+    }
+
+    fun signInWithGoogle(
+        activityContext: Context,
+        isSignUp: Boolean = false,
+        onSuccess: () -> Unit = {}
+    ) {
         val manager = authSessionManager
         if (manager == null) {
-            val msg = "Cloud sign-in is unavailable in this build because Firebase google-services.json is not configured. Continue as Guest or add GOOGLE_SERVICES_JSON to GitHub Secrets."
+            val msg = "Google Cloud Sign-In requires google-services.json configuration. Use email Sign Up/Login above or Continue as Guest."
             _authErrorMessage.value = msg
             _snackbarEvents.tryEmit(msg)
             return
@@ -1826,11 +1914,14 @@ class VaultViewModel(
             val res = manager.signInWithGoogle(activityContext)
             _isAuthBusy.value = false
             res.onSuccess { user ->
+                _authUser.value = user
+                preferencesRepository?.setActiveLocalAccountId(null)
                 preferencesRepository?.setOnboardingCompleted(completed = true, isGuest = false)
                 _snackbarEvents.tryEmit(
-                    if (isSignUp) "Account created! Welcome, ${user.displayName}"
+                    if (isSignUp) "Google account connected! Welcome, ${user.displayName}"
                     else "Welcome back, ${user.displayName}"
                 )
+                onSuccess()
             }.onFailure { err ->
                 if (err is AuthCancelledException) {
                     _authErrorMessage.value = null
@@ -1852,13 +1943,14 @@ class VaultViewModel(
     }
 
     fun signOut(context: Context) {
-        val manager = authSessionManager ?: return
         cloudSyncJob?.cancel()
         viewModelScope.launch {
             _isAuthBusy.value = true
-            manager.signOut(context)
+            authSessionManager?.signOut(context)
+            preferencesRepository?.setActiveLocalAccountId(null)
             preferencesRepository?.setLastSyncedUid(null)
             preferencesRepository?.setGuestMode(true)
+            _authUser.value = null
             _pendingGuestMergeCount.value = 0
             _isAuthBusy.value = false
             _snackbarEvents.tryEmit("Signed out. Switched to Guest Mode.")
@@ -1876,7 +1968,7 @@ class VaultViewModel(
     }
 
     fun syncLocalVaultToCloud() {
-        val uid = _authUser.value?.uid ?: return
+        val uid = cloudUserId() ?: return
         val cloud = cloudRepository ?: return
         viewModelScope.launch {
             _isSyncingCloud.value = true
@@ -1914,7 +2006,7 @@ class VaultViewModel(
                 }
                 val mergeRes = repository.importAndMergeEntries(pack.entries)
                 mergeRes.onSuccess { (inserted, updated) ->
-                    val uid = _authUser.value?.uid
+                    val uid = cloudUserId()
                     if (uid != null && cloudRepository != null) {
                         cloudRepository.mergeLocalEntriesToCloud(uid, pack.entries)
                     }
@@ -1967,7 +2059,7 @@ class VaultViewModel(
     }
 
     private fun mirrorEntryToCloud(entryId: String) {
-        val uid = _authUser.value?.uid ?: return
+        val uid = cloudUserId() ?: return
         val cloud = cloudRepository ?: return
         viewModelScope.launch {
             val entry = repository.getVaultEntry(entryId).getOrNull() ?: return@launch
@@ -1978,7 +2070,7 @@ class VaultViewModel(
     }
 
     private fun deleteEntryFromCloud(entryId: String) {
-        val uid = _authUser.value?.uid ?: return
+        val uid = cloudUserId() ?: return
         val cloud = cloudRepository ?: return
         viewModelScope.launch {
             cloud.deleteEntry(uid, entryId).onFailure { err ->

@@ -93,6 +93,7 @@ fun CineVaultDrawerHost(
     totalWatched: Int,
     totalBucketlist: Int,
     onSignInClick: () -> Unit,
+    onConnectGoogleClick: () -> Unit,
     onSignOutClick: () -> Unit,
     onSyncLocalClick: () -> Unit,
     onToggleTheme: (Boolean) -> Unit,
@@ -285,10 +286,70 @@ fun CineVaultDrawerHost(
                                         Spacer(modifier = Modifier.width(8.dp))
                                     }
                                     Text(
-                                        text = "Sign In / Sync Account",
+                                        text = "Sign In / Create Account",
                                         style = MaterialTheme.typography.labelLarge,
                                         fontWeight = FontWeight.Bold
                                     )
+                                }
+                            } else if (!authUser.isCloudSynced) {
+                                Surface(
+                                    color = colors.gold.copy(alpha = 0.12f),
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = BorderStroke(1.dp, colors.gold.copy(alpha = 0.35f))
+                                ) {
+                                    Text(
+                                        text = "Standard Account · Saved on this device",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = colors.gold,
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                    )
+                                }
+                                Button(
+                                    onClick = onConnectGoogleClick,
+                                    enabled = !isAuthBusy,
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = colors.gold,
+                                        contentColor = colors.onGold
+                                    ),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(48.dp)
+                                        .testTag("drawer_connect_google_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.CloudSync,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Connect Google for Cloud Sync",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                OutlinedButton(
+                                    onClick = onSignOutClick,
+                                    enabled = !isAuthBusy,
+                                    shape = RoundedCornerShape(12.dp),
+                                    border = BorderStroke(1.dp, colors.crimson.copy(alpha = 0.5f)),
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        contentColor = colors.crimson
+                                    ),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(48.dp)
+                                        .testTag("drawer_sign_out_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Rounded.Logout,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Sign Out", maxLines = 1)
                                 }
                             } else {
                                 Row(

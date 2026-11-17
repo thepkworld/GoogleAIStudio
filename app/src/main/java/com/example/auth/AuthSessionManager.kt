@@ -28,7 +28,8 @@ data class AuthUserSummary(
     val uid: String,
     val displayName: String,
     val email: String,
-    val photoUrl: String
+    val photoUrl: String,
+    val isCloudSynced: Boolean = true
 )
 
 class AuthCancelledException(message: String = "Google Sign-In was cancelled") : Exception(message)

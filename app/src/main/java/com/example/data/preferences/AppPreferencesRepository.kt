@@ -21,7 +21,8 @@ data class AppPreferencesState(
     val isDarkTheme: Boolean = true,
     val hasCompletedOnboarding: Boolean = false,
     val isGuestMode: Boolean = false,
-    val lastSyncedUid: String? = null
+    val lastSyncedUid: String? = null,
+    val activeLocalAccountId: String? = null
 )
 
 class AppPreferencesRepository(
@@ -42,7 +43,8 @@ class AppPreferencesRepository(
                 isDarkTheme = prefs[KEY_DARK_THEME] ?: true,
                 hasCompletedOnboarding = prefs[KEY_ONBOARDING_DONE] ?: false,
                 isGuestMode = prefs[KEY_GUEST_MODE] ?: false,
-                lastSyncedUid = prefs[KEY_LAST_SYNCED_UID]?.ifBlank { null }
+                lastSyncedUid = prefs[KEY_LAST_SYNCED_UID]?.ifBlank { null },
+                activeLocalAccountId = prefs[KEY_ACTIVE_LOCAL_ACCOUNT_ID]?.ifBlank { null }
             )
         }
 
@@ -75,10 +77,23 @@ class AppPreferencesRepository(
         }
     }
 
+    suspend fun setActiveLocalAccountId(accountId: String?) {
+        dataStore.edit { prefs ->
+            if (accountId.isNullOrBlank()) {
+                prefs.remove(KEY_ACTIVE_LOCAL_ACCOUNT_ID)
+            } else {
+                prefs[KEY_ACTIVE_LOCAL_ACCOUNT_ID] = accountId
+                prefs[KEY_ONBOARDING_DONE] = true
+                prefs[KEY_GUEST_MODE] = false
+            }
+        }
+    }
+
     private companion object {
         val KEY_DARK_THEME = booleanPreferencesKey("is_dark_theme")
         val KEY_ONBOARDING_DONE = booleanPreferencesKey("has_completed_onboarding")
         val KEY_GUEST_MODE = booleanPreferencesKey("is_guest_mode")
         val KEY_LAST_SYNCED_UID = stringPreferencesKey("last_synced_uid")
+        val KEY_ACTIVE_LOCAL_ACCOUNT_ID = stringPreferencesKey("active_local_account_id")
     }
 }

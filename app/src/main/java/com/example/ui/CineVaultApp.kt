@@ -117,6 +117,7 @@ import com.example.data.model.WatchStatus
 import com.example.data.omdb.OmdbRepository
 import com.example.data.preferences.AppPreferencesRepository
 import com.example.data.remote.VaultCloudRepository
+import com.example.data.repository.LocalAccountRepository
 import com.example.data.repository.VaultRepository
 import com.example.data.tmdb.TmdbRepository
 import com.example.ui.components.CineVaultDrawerHost
@@ -195,7 +196,8 @@ fun defaultCineVaultViewModelFactory(): ViewModelProvider.Factory = viewModelFac
                 runCatching { AuthSessionManager() }.getOrNull()
             } else {
                 null
-            }
+            },
+            localAccountRepository = LocalAccountRepository(app)
         )
     }
 }
@@ -249,8 +251,15 @@ fun CineVaultApp(
         OnboardingAuthScreen(
             isBusy = isAuthBusy,
             errorMessage = authErrorMessage,
-            onSignUpClick = { vaultViewModel.signInWithGoogle(activityContext, isSignUp = true) },
-            onSignInClick = { vaultViewModel.signInWithGoogle(activityContext, isSignUp = false) },
+            onEmailSignUpClick = { name, email, pass, confirm ->
+                vaultViewModel.signUpWithEmail(name, email, pass, confirm)
+            },
+            onEmailSignInClick = { email, pass ->
+                vaultViewModel.signInWithEmail(email, pass)
+            },
+            onGoogleSignInClick = { isSignUp ->
+                vaultViewModel.signInWithGoogle(activityContext, isSignUp = isSignUp)
+            },
             onContinueGuestClick = { vaultViewModel.continueAsGuest() },
             onDismissError = { vaultViewModel.clearAuthError() }
         )
@@ -260,6 +269,7 @@ fun CineVaultApp(
     val navController = rememberNavController()
     var selectedTab by rememberSaveable { mutableStateOf(VaultTab.HOME) }
     var isDrawerOpen by rememberSaveable { mutableStateOf(false) }
+    var showAuthModal by rememberSaveable { mutableStateOf(false) }
     var searchRetapTrigger by remember { mutableIntStateOf(0) }
     var searchFilterMenuTrigger by remember { mutableIntStateOf(0) }
     var showSeasonSheet by remember { mutableStateOf(false) }
@@ -370,6 +380,11 @@ fun CineVaultApp(
                 totalWatched = vaultStats.totalWatched,
                 totalBucketlist = vaultStats.totalWatchlist,
                 onSignInClick = {
+                    isDrawerOpen = false
+                    vaultViewModel.clearAuthError()
+                    showAuthModal = true
+                },
+                onConnectGoogleClick = {
                     isDrawerOpen = false
                     vaultViewModel.signInWithGoogle(activityContext, isSignUp = false)
                 },
@@ -970,7 +985,7 @@ fun CineVaultApp(
         )
     }
 
-    if (authUser != null && pendingGuestMergeCount > 0) {
+    if (authUser != null && authUser!!.isCloudSynced && pendingGuestMergeCount > 0) {
         AlertDialog(
             onDismissRequest = { vaultViewModel.dismissGuestMergePrompt() },
             containerColor = colors.slate,
@@ -1011,6 +1026,38 @@ fun CineVaultApp(
                 }
             },
             modifier = Modifier.testTag("guest_merge_dialog")
+        )
+    }
+
+    if (showAuthModal) {
+        OnboardingAuthScreen(
+            isBusy = isAuthBusy,
+            errorMessage = authErrorMessage,
+            initialSignUpMode = false,
+            onEmailSignUpClick = { name, email, pass, confirm ->
+                vaultViewModel.signUpWithEmail(name, email, pass, confirm) {
+                    showAuthModal = false
+                }
+            },
+            onEmailSignInClick = { email, pass ->
+                vaultViewModel.signInWithEmail(email, pass) {
+                    showAuthModal = false
+                }
+            },
+            onGoogleSignInClick = { isSignUp ->
+                vaultViewModel.signInWithGoogle(activityContext, isSignUp = isSignUp) {
+                    showAuthModal = false
+                }
+            },
+            onContinueGuestClick = {
+                vaultViewModel.clearAuthError()
+                showAuthModal = false
+            },
+            onDismissError = { vaultViewModel.clearAuthError() },
+            onCloseClick = {
+                vaultViewModel.clearAuthError()
+                showAuthModal = false
+            }
         )
     }
 }
